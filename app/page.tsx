@@ -26,7 +26,7 @@ const netEasePlaylist = {
 
 // Playlist tracks will be populated after the playlist API/proxy is connected.
 const musicTracks: MusicTrack[] = [];
-const emptyMusicTrack: MusicTrack = { title: "未选择歌曲", artist: "网易云音乐歌单", cover: "", src: "" };
+const emptyMusicTrack: MusicTrack = { title: "未选择歌曲", artist: "", cover: "", src: "" };
 
 const lunarDayNames = ["", "初一", "初二", "初三", "初四", "初五", "初六", "初七", "初八", "初九", "初十", "十一", "十二", "十三", "十四", "十五", "十六", "十七", "十八", "十九", "二十", "廿一", "廿二", "廿三", "廿四", "廿五", "廿六", "廿七", "廿八", "廿九", "三十"];
 
@@ -343,7 +343,7 @@ function MusicPlayerBar({ compact = false }: { compact?: boolean }) {
         ) : null}
         <div className="music-bar__track-info">
           <div className={`music-bar__cover ${isPlaying ? "is-playing" : ""}`} style={track.cover ? { backgroundImage: `url(${track.cover})` } : undefined}><span>♪</span></div>
-          <div><strong>{track.title}</strong><small>{track.artist}</small></div>
+          <div className="music-bar__track-label"><strong>{track.title}</strong>{track.artist ? <><span className="music-bar__separator"> - </span><small>{track.artist}</small></> : null}</div>
         </div>
         <div className="music-bar__center">
           <div className="music-bar__transport">
