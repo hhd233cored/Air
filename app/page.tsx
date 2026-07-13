@@ -130,8 +130,8 @@ function useLocalWeather() {
           const locationResponse = await fetch(locationUrl);
           const locationPayload = await locationResponse.json() as { address?: Record<string, string> };
           const address = locationPayload.address;
-          const city = address?.city ?? address?.municipality ?? address?.state_district ?? address?.county ?? address?.state;
-          const district = address?.district ?? address?.city_district ?? address?.town ?? address?.suburb;
+          const city = address?.state_district ?? address?.city ?? address?.municipality ?? address?.state;
+          const district = address?.district ?? address?.city_district ?? (address?.county !== city ? address?.county : undefined);
           location = [city, district].filter((part, index, parts) => part && parts.indexOf(part) === index).join(" ") || location;
         } catch {
           // Weather still works when reverse geocoding is unavailable.
