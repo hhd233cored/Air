@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 type PageKey = "home" | "projects" | "about";
 
@@ -25,6 +25,35 @@ function PageButton({ active, index, label, onClick }: { active: boolean; index:
   );
 }
 
+function useCurrentTime() {
+  const [now, setNow] = useState<Date | null>(null);
+
+  useEffect(() => {
+    const update = () => setNow(new Date());
+    update();
+    const timer = window.setInterval(update, 1000);
+    return () => window.clearInterval(timer);
+  }, []);
+
+  return now;
+}
+
+function ClockDisplay({ now }: { now: Date | null }) {
+  const time = now
+    ? new Intl.DateTimeFormat("zh-CN", { hour: "2-digit", minute: "2-digit", hour12: false }).format(now)
+    : "--:--";
+  const date = now
+    ? new Intl.DateTimeFormat("zh-CN", { year: "numeric", month: "long", day: "numeric", weekday: "long" }).format(now)
+    : "正在读取日期";
+
+  return (
+    <section className="clock-display" aria-label="当前时间">
+      <div className="clock-display__time">{time}</div>
+      <div className="clock-display__date">{date}</div>
+    </section>
+  );
+}
+
 function GlassHeader({ eyebrow, title, copy }: { eyebrow: string; title: string; copy: string }) {
   return (
     <div className="page-heading">
@@ -37,13 +66,24 @@ function GlassHeader({ eyebrow, title, copy }: { eyebrow: string; title: string;
   );
 }
 
-function AlbumGraphic() {
+function CalendarCard({ now }: { now: Date | null }) {
+  const month = now ? `${now.getFullYear()}年${now.getMonth() + 1}月` : "2026年7月";
+  const day = now ? now.getDate() : 13;
+  const weekday = now ? new Intl.DateTimeFormat("zh-CN", { weekday: "long" }).format(now) : "星期一";
+
   return (
-    <div className="album-graphic" aria-hidden="true">
-      <div className="album-disc"><span>✦</span></div>
-      <div className="album-orbit album-orbit--one" />
-      <div className="album-orbit album-orbit--two" />
-    </div>
+    <article className="glass-card calendar-card dashboard-card">
+      <div className="calendar-card__month">{month}</div>
+      <div className="calendar-card__body">
+        <div className="calendar-card__day">{day}</div>
+        <div className="calendar-card__meta">
+          <span>{weekday}</span>
+          <strong>Keep a little room for today.</strong>
+          <span>Personal calendar</span>
+        </div>
+      </div>
+      <div className="calendar-card__footer"><span>Today&apos;s page</span><span>↗</span></div>
+    </article>
   );
 }
 
@@ -58,11 +98,9 @@ function PhotoWallGraphic() {
   );
 }
 
-function HomePage({ onPageChange }: { onPageChange: (page: PageKey) => void }) {
+function HomePage({ onPageChange, now }: { onPageChange: (page: PageKey) => void; now: Date | null }) {
   return (
     <>
-      <GlassHeader eyebrow="Personal dashboard / 2026" title="A small space on the internet." copy="记录正在发生的事，收藏值得留下的灵感，也把一些想法慢慢做成作品。" />
-
       <div className="dashboard-grid">
         <article className="glass-card profile-card dashboard-card dashboard-card--profile">
           <div className="card-topline"><span>01 / Profile</span><span>•••</span></div>
@@ -80,13 +118,7 @@ function HomePage({ onPageChange }: { onPageChange: (page: PageKey) => void }) {
           </div>
         </article>
 
-        <article className="glass-card player-card dashboard-card">
-          <div className="card-topline"><span>02 / Currently</span><span>↗</span></div>
-          <AlbumGraphic />
-          <div className="player-copy"><p className="card-kicker">Listening to</p><h2>Quiet hours</h2><p className="muted-copy">A soft soundtrack for making things.</p></div>
-          <div className="player-progress"><span /></div>
-          <div className="player-time"><span>02:16</span><span>04:52</span></div>
-        </article>
+        <CalendarCard now={now} />
 
         <article className="glass-card quote-card dashboard-card">
           <span className="quote-mark">“</span>
@@ -178,7 +210,7 @@ function AboutPage() {
 
 export default function Home() {
   const [activePage, setActivePage] = useState<PageKey>("home");
-  const currentPage = navigation.find((item) => item.id === activePage) ?? navigation[0];
+  const now = useCurrentTime();
 
   return (
     <main className="site-shell">
@@ -204,9 +236,10 @@ export default function Home() {
         </div>
       </header>
 
+      <ClockDisplay now={now} />
+
       <div className="workspace-shell shell">
-        <div className="breadcrumb"><span>YOUR SPACE</span><span>/</span><strong>{currentPage.label}</strong></div>
-        {activePage === "home" && <HomePage onPageChange={setActivePage} />}
+        {activePage === "home" && <HomePage onPageChange={setActivePage} now={now} />}
         {activePage === "projects" && <ProjectsPage />}
         {activePage === "about" && <AboutPage />}
       </div>
