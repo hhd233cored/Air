@@ -1,6 +1,7 @@
 "use client";
 
 import { type ReactNode, useEffect, useRef, useState } from "react";
+import { type ArticleSummary, getPublishedArticle, getPublishedArticles } from "./lib/api/articles";
 
 type PageKey = "home" | "projects" | "about" | "article";
 
@@ -16,6 +17,19 @@ const projects = [
   { title: "Orbit / 01", type: "Experiment / 2025", description: "A small interactive study of light, distance, and moving slowly.", color: "mint" },
   { title: "Slow Internet", type: "Editorial / 2025", description: "Notes on attention, digital gardens, and making room for thought.", color: "peach" },
 ];
+
+const fallbackLatestPosts = [
+  { date: "07.13", title: "把网站留一点呼吸感" },
+  { date: "06.28", title: "重新理解“完成”这件事" },
+  { date: "06.10", title: "三种保持好奇的练习" },
+];
+
+function formatArticleDate(value: string | null) {
+  if (!value) return "--.--";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "--.--";
+  return `${String(date.getMonth() + 1).padStart(2, "0")}.${String(date.getDate()).padStart(2, "0")}`;
+}
 
 type MusicTrack = { title: string; artist: string; cover: string; src: string };
 
@@ -117,6 +131,8 @@ function useLocalWeather() {
     let cancelled = false;
 
     if (!navigator.geolocation) {
+      // This effect reports an external browser capability to the UI.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setStatus("unsupported");
       return () => { cancelled = true; };
     }
@@ -304,6 +320,8 @@ function MusicPlayerBar({ compact = false }: { compact?: boolean }) {
 
   useEffect(() => {
     const audio = audioRef.current;
+    // Reset playback state when the selected external audio resource changes.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setCurrentTime(0);
     setDuration(0);
     setIsPlaying(false);
@@ -368,6 +386,25 @@ function MusicPlayerBar({ compact = false }: { compact?: boolean }) {
 }
 
 function HomePage({ onPageChange, now }: { onPageChange: (page: PageKey) => void; now: Date | null }) {
+  const [latestArticles, setLatestArticles] = useState<ArticleSummary[]>([]);
+
+  useEffect(() => {
+    let cancelled = false;
+    getPublishedArticles(0, 3)
+      .then((result) => {
+        if (!cancelled) setLatestArticles(result.content);
+      })
+      .catch(() => {
+        // Keep the local sample posts when the Java API is not running.
+      });
+
+    return () => { cancelled = true; };
+  }, []);
+
+  const latestPosts = latestArticles.length
+    ? latestArticles.map((article) => ({ date: formatArticleDate(article.publishedAt), title: article.title, slug: article.slug }))
+    : fallbackLatestPosts.map((post) => ({ ...post, slug: post.title }));
+
   return (
     <>
       <div className="dashboard-grid">
@@ -395,9 +432,7 @@ function HomePage({ onPageChange, now }: { onPageChange: (page: PageKey) => void
           <article className="glass-card posts-card dashboard-card">
             <div className="card-heading"><div><p className="card-kicker">04 / Notes</p><h2>最新文章</h2></div><button className="more-button" type="button">更多</button></div>
             <div className="post-list">
-              <div className="post-item"><span>07.13</span><strong>把网站留一点呼吸感</strong><em>↗</em></div>
-              <div className="post-item"><span>06.28</span><strong>重新理解“完成”这件事</strong><em>↗</em></div>
-              <div className="post-item"><span>06.10</span><strong>三种保持好奇的练习</strong><em>↗</em></div>
+              {latestPosts.map((post) => <div className="post-item" key={post.slug}><span>{post.date}</span><strong>{post.title}</strong><em>↗</em></div>)}
             </div>
           </article>
 
@@ -588,20 +623,32 @@ function ArticlePage() {
 
   useEffect(() => {
     let cancelled = false;
-    fetch("/articles/first-note.md")
-      .then((response) => {
+    const loadArticle = async () => {
+      try {
+        const article = await getPublishedArticle("first-note");
+        if (!cancelled) {
+          setSource(article.contentMarkdown);
+          setStatus("ready");
+        }
+        return;
+      } catch {
+        // Fall back to the bundled Markdown demo while the Java API is offline.
+      }
+
+      try {
+        const response = await fetch("/articles/first-note.md");
         if (!response.ok) throw new Error("article request failed");
-        return response.text();
-      })
-      .then((markdown) => {
+        const markdown = await response.text();
         if (!cancelled) {
           setSource(markdown);
           setStatus("ready");
         }
-      })
-      .catch(() => {
+      } catch {
         if (!cancelled) setStatus("error");
-      });
+      }
+    };
+
+    void loadArticle();
 
     return () => { cancelled = true; };
   }, []);

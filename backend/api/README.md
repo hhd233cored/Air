@@ -1,7 +1,5 @@
-# API
+# API 说明
 
-后续可以按领域拆分 API，例如：
+文章接口当前位于 `src/main/java/com/yourspace/article/controller/ArticleController.java`，统一使用 `/api/v1/articles` 前缀。
 
-- `articles/`：文章列表、详情、草稿和发布
-- `music/`：歌单和播放器数据
-- `profile/`：个人资料和站点配置
+Swagger UI：`http://localhost:8080/swagger-ui.html`

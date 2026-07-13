@@ -11,7 +11,10 @@
     "start": "vinext start",
     "test": "npm run build && node --test tests/rendered-html.test.mjs",
     "lint": "eslint . --ignore-pattern dist --ignore-pattern .next",
-    "db:generate": "drizzle-kit generate"
+    "db:generate": "drizzle-kit generate",
+    "backend:up": "docker compose up --build",
+    "backend:down": "docker compose down",
+    "backend:test": "mvn -f backend/pom.xml test"
   },
   "dependencies": {
     "drizzle-orm": "0.45.2",

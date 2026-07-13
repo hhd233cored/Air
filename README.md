@@ -16,17 +16,25 @@ npm run dev
 npm run build
 ```
 
+Java backend local environment:
+
+```bash
+docker compose up --build
+```
+
+The frontend uses `http://localhost:8080` when `NEXT_PUBLIC_API_BASE_URL` is set. If the Java API is not running, the article page falls back to the bundled Markdown sample.
+
 This starter does not use `wrangler.jsonc`.
 
 ## Included Shape
 
 - edit frontend site code under `app/`
-- add backend APIs and services under `backend/`
+- add the Java backend under `backend/`
 - `.openai/hosting.json` declares optional Sites D1 and R2 bindings
 - `vite.config.ts` simulates declared bindings for local development
-- `backend/db/schema.ts` starts intentionally empty
-- `examples/d1/` contains an optional D1 example surface
+- `examples/d1/` contains the optional TypeScript D1 example surface
 - `drizzle.config.ts` supports local migration generation when needed
+- `backend/` contains the Java Spring Boot service and Flyway migrations
 
 ## Workspace Auth Headers
 
