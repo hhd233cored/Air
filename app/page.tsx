@@ -130,8 +130,8 @@ function useLocalWeather() {
           const locationResponse = await fetch(locationUrl);
           const locationPayload = await locationResponse.json() as { address?: Record<string, string> };
           const address = locationPayload.address;
-          const city = address?.city ?? address?.municipality ?? address?.state;
-          const district = address?.district ?? address?.county ?? address?.town;
+          const city = address?.city ?? address?.municipality ?? address?.state_district ?? address?.county ?? address?.state;
+          const district = address?.district ?? address?.city_district ?? address?.town ?? address?.suburb;
           location = [city, district].filter((part, index, parts) => part && parts.indexOf(part) === index).join(" ") || location;
         } catch {
           // Weather still works when reverse geocoding is unavailable.
@@ -304,12 +304,6 @@ function HomePage({ onPageChange, now }: { onPageChange: (page: PageKey) => void
         </article>
 
         <CalendarCard now={now} />
-
-        <article className="glass-card quote-card dashboard-card">
-          <span className="quote-mark">“</span>
-          <p>Make it simple, but significant.</p>
-          <span className="quote-author">— Don Draper</span>
-        </article>
 
         <article className="glass-card photo-card dashboard-card">
           <div className="card-heading"><div><p className="card-kicker">03 / Photo wall</p><h2>Recent frames</h2></div><span className="round-arrow">↗</span></div>
