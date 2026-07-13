@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 type PageKey = "home" | "projects" | "about";
 
@@ -14,6 +14,13 @@ const projects = [
   { title: "Luma Notes", type: "Product / 2026", description: "A quiet place for ideas, fragments, and the things worth keeping.", color: "lilac" },
   { title: "Orbit / 01", type: "Experiment / 2025", description: "A small interactive study of light, distance, and moving slowly.", color: "mint" },
   { title: "Slow Internet", type: "Editorial / 2025", description: "Notes on attention, digital gardens, and making room for thought.", color: "peach" },
+];
+
+type MusicTrack = { title: string; artist: string; cover: string; src: string };
+
+// Replace this placeholder with tracks returned by your playlist source.
+const musicTracks: MusicTrack[] = [
+  { title: "Your soundtrack", artist: "等待接入网易云歌单", cover: "", src: "" },
 ];
 
 const lunarDayNames = ["", "初一", "初二", "初三", "初四", "初五", "初六", "初七", "初八", "初九", "初十", "十一", "十二", "十三", "十四", "十五", "十六", "十七", "十八", "十九", "二十", "廿一", "廿二", "廿三", "廿四", "廿五", "廿六", "廿七", "廿八", "廿九", "三十"];
@@ -272,14 +279,73 @@ function CalendarCard({ now }: { now: Date | null }) {
   );
 }
 
-function PhotoWallGraphic() {
+function formatMusicTime(seconds: number) {
+  if (!Number.isFinite(seconds) || seconds < 0) return "0:00";
+  const minutes = Math.floor(seconds / 60);
+  const remainingSeconds = Math.floor(seconds % 60).toString().padStart(2, "0");
+  return `${minutes}:${remainingSeconds}`;
+}
+
+function MusicPlayerCard() {
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const [trackIndex, setTrackIndex] = useState(0);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [currentTime, setCurrentTime] = useState(0);
+  const [duration, setDuration] = useState(0);
+  const [volume, setVolume] = useState(0.72);
+  const track = musicTracks[trackIndex] ?? musicTracks[0];
+
+  useEffect(() => {
+    const audio = audioRef.current;
+    setCurrentTime(0);
+    setDuration(0);
+    setIsPlaying(false);
+    audio?.pause();
+    audio?.load();
+  }, [trackIndex]);
+
+  useEffect(() => {
+    if (audioRef.current) audioRef.current.volume = volume;
+  }, [volume]);
+
+  const changeTrack = (offset: number) => {
+    setTrackIndex((index) => (index + offset + musicTracks.length) % musicTracks.length);
+  };
+
+  const togglePlayback = async () => {
+    const audio = audioRef.current;
+    if (!audio || !track.src) return;
+    if (audio.paused) await audio.play();
+    else audio.pause();
+  };
+
+  const seek = (value: number) => {
+    if (!audioRef.current) return;
+    audioRef.current.currentTime = value;
+    setCurrentTime(value);
+  };
+
   return (
-    <div className="photo-wall" aria-hidden="true">
-      <div className="photo-tile photo-tile--one"><span>01</span></div>
-      <div className="photo-tile photo-tile--two"><span>02</span></div>
-      <div className="photo-tile photo-tile--three"><span>03</span></div>
-      <div className="photo-tile photo-tile--four"><span>04</span></div>
-    </div>
+    <article className="glass-card music-card dashboard-card">
+      <div className="card-topline"><span>03 / Music</span><span>{isPlaying ? "Playing" : "Paused"}</span></div>
+      <div className="music-card__heading"><h2>{track.title}</h2><p>{track.artist}</p></div>
+      <div className={`music-disc ${isPlaying ? "is-playing" : ""}`} style={track.cover ? { backgroundImage: `url(${track.cover})` } : undefined}>
+        <span className="music-disc__label">{track.cover ? "" : "YN"}</span>
+        <span className="music-disc__hole" />
+      </div>
+      <div className="music-progress">
+        <input aria-label="播放进度" type="range" min="0" max={duration || 0} step="0.1" value={Math.min(currentTime, duration || 0)} onChange={(event) => seek(Number(event.target.value))} disabled={!duration} />
+        <div><span>{formatMusicTime(currentTime)}</span><span>{formatMusicTime(duration)}</span></div>
+      </div>
+      <div className="music-controls">
+        <button type="button" aria-label="上一首" onClick={() => changeTrack(-1)}>◀◀</button>
+        <button className="music-play-button" type="button" aria-label={isPlaying ? "暂停" : "播放"} onClick={togglePlayback} disabled={!track.src}>{isPlaying ? "Ⅱ" : "▶"}</button>
+        <button type="button" aria-label="下一首" onClick={() => changeTrack(1)}>▶▶</button>
+        <label className="music-volume" aria-label="音量"><span>◖</span><input type="range" min="0" max="1" step="0.01" value={volume} onChange={(event) => setVolume(Number(event.target.value))} /></label>
+      </div>
+      {!track.src ? <p className="music-card__hint">提供网易云歌单后，这里会载入歌曲与专辑封面。</p> : null}
+      <audio ref={audioRef} src={track.src || undefined} preload="metadata" onPlay={() => setIsPlaying(true)} onPause={() => setIsPlaying(false)} onEnded={() => changeTrack(1)} onLoadedMetadata={(event) => setDuration(event.currentTarget.duration)} onTimeUpdate={(event) => setCurrentTime(event.currentTarget.currentTime)} />
+    </article>
   );
 }
 
@@ -305,11 +371,7 @@ function HomePage({ onPageChange, now }: { onPageChange: (page: PageKey) => void
 
         <CalendarCard now={now} />
 
-        <article className="glass-card photo-card dashboard-card">
-          <div className="card-heading"><div><p className="card-kicker">03 / Photo wall</p><h2>Recent frames</h2></div><span className="round-arrow">↗</span></div>
-          <PhotoWallGraphic />
-          <div className="card-footer"><span>Four fragments from an ordinary week</span><span>View 24</span></div>
-        </article>
+        <MusicPlayerCard />
 
         <div className="feed-column">
           <article className="glass-card posts-card dashboard-card">
