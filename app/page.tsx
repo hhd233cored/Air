@@ -335,9 +335,11 @@ function MusicPlayerBar() {
   return (
     <div className="music-player-block">
       <article className="music-player-bar">
-        <div className="music-bar-progress">
-          <input aria-label="播放进度" type="range" min="0" max={duration || 0} step="0.1" value={Math.min(currentTime, duration || 0)} onChange={(event) => seek(Number(event.target.value))} disabled={!duration} />
-        </div>
+        {duration > 0 ? (
+          <div className="music-bar-progress">
+            <input aria-label="播放进度" type="range" min="0" max={duration} step="0.1" value={Math.min(currentTime, duration)} onChange={(event) => seek(Number(event.target.value))} />
+          </div>
+        ) : null}
         <div className="music-bar__track-info">
           <div className={`music-bar__cover ${isPlaying ? "is-playing" : ""}`} style={track.cover ? { backgroundImage: `url(${track.cover})` } : undefined}><span>♪</span></div>
           <div><strong>{track.title}</strong><small>{track.artist}</small></div>
