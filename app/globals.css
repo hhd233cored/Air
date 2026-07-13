@@ -142,6 +142,7 @@ button:focus-visible { outline: 2px solid var(--mint); outline-offset: 3px; }
 .music-player-block--compact .music-bar__track-label strong, .music-player-block--compact .music-bar__track-label small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .music-player-block--compact .music-bar__track-label strong { max-width: 62%; }
 .music-player-block--compact .music-bar__track-label small { max-width: 34%; }
+.music-player-block--compact .music-bar__track-label.is-single strong { max-width: 100%; overflow: visible; text-overflow: clip; }
 .music-player-block--compact .music-bar__separator { color: var(--faint); }
 .music-bar__track-info strong { overflow: hidden; color: var(--text); font-size: 15px; font-weight: 550; letter-spacing: -.03em; text-overflow: ellipsis; white-space: nowrap; }
 .music-bar__track-info small { overflow: hidden; color: var(--muted); font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }

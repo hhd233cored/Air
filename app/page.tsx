@@ -343,7 +343,7 @@ function MusicPlayerBar({ compact = false }: { compact?: boolean }) {
         ) : null}
         <div className="music-bar__track-info">
           <div className={`music-bar__cover ${isPlaying ? "is-playing" : ""}`} style={track.cover ? { backgroundImage: `url(${track.cover})` } : undefined}><span>♪</span></div>
-          {track.title || track.artist ? <div className="music-bar__track-label"><strong>{track.title}</strong>{track.artist ? <><span className="music-bar__separator"> - </span><small>{track.artist}</small></> : null}</div> : null}
+          {track.title || track.artist ? <div className={`music-bar__track-label ${track.artist ? "" : "is-single"}`}><strong>{track.title}</strong>{track.artist ? <><span className="music-bar__separator"> - </span><small>{track.artist}</small></> : null}</div> : null}
         </div>
         <div className="music-bar__center">
           <div className="music-bar__transport">
