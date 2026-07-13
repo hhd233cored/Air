@@ -185,6 +185,12 @@ export default function Home() {
       <div className="ambient ambient--one" aria-hidden="true" />
       <div className="ambient ambient--two" aria-hidden="true" />
       <div className="ambient ambient--three" aria-hidden="true" />
+      <div className="cover-space shell" aria-label="顶部图片预留区域">
+        <div className="cover-space__inner">
+          <span className="cover-space__label">01 / Cover image</span>
+          <span className="cover-space__hint">Reserved space for your future image</span>
+        </div>
+      </div>
       <header className="site-header shell">
         <div className="brand"><span className="brand-mark">✦</span><span>YOUR <i>/</i> SPACE</span></div>
         <div className="search-pill"><span>⌕</span><span>Search this space...</span><kbd>⌘ K</kbd></div>
