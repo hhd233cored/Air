@@ -49,7 +49,7 @@ button:focus-visible { outline: 2px solid var(--mint); outline-offset: 3px; }
 .cover-space__label, .cover-space__hint { font-family: var(--font-geist-mono), Consolas, monospace; font-size: 9px; letter-spacing: .07em; text-transform: uppercase; }
 .cover-space__label { color: #8b73c9; }
 .cover-space__hint { color: #aaa1b2; }
-.site-header { position: sticky; top: 12px; z-index: 10; width: 100%; min-height: 70px; margin-top: 16px; padding: 10px 0; border-block: 1px solid rgb(104 90 135 / .18); background: rgb(255 255 255 / .64); box-shadow: 0 12px 34px rgb(104 82 144 / .11), inset 0 1px 0 rgb(255 255 255 / .85); backdrop-filter: blur(22px); }
+.site-header { position: sticky; top: 12px; z-index: 10; width: 100%; min-height: 70px; margin-top: 0; padding: 10px 0; border-block: 1px solid rgb(104 90 135 / .18); background: rgb(255 255 255 / .64); box-shadow: 0 12px 34px rgb(104 82 144 / .11), inset 0 1px 0 rgb(255 255 255 / .85); backdrop-filter: blur(22px); }
 .site-header__inner { display: grid; grid-template-columns: auto minmax(230px, 360px) auto auto; align-items: center; gap: 28px; min-height: 48px; }
 .brand { display: flex; align-items: center; gap: 10px; color: var(--text); font-size: 11px; font-weight: 700; letter-spacing: .13em; white-space: nowrap; }
 .brand i { color: var(--accent); font-style: normal; }
