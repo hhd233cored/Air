@@ -1,13 +1,14 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { type ReactNode, useEffect, useRef, useState } from "react";
 
-type PageKey = "home" | "projects" | "about";
+type PageKey = "home" | "projects" | "about" | "article";
 
 const navigation: { id: PageKey; label: string; index: string }[] = [
   { id: "home", label: "Home", index: "01" },
   { id: "projects", label: "Projects", index: "02" },
   { id: "about", label: "About", index: "03" },
+  { id: "article", label: "Article", index: "04" },
 ];
 
 const projects = [
@@ -466,6 +467,172 @@ function AboutPage() {
   );
 }
 
+function renderInlineMarkdown(text: string): ReactNode[] {
+  const pattern = /(\[([^\]]+)\]\((https?:\/\/[^)\s]+)\)|`([^`]+)`|\*\*([^*]+)\*\*|\*([^*]+)\*)/g;
+  const nodes: ReactNode[] = [];
+  let lastIndex = 0;
+  let match: RegExpExecArray | null;
+
+  while ((match = pattern.exec(text)) !== null) {
+    if (match.index > lastIndex) nodes.push(text.slice(lastIndex, match.index));
+    if (match[2] && match[3]) {
+      nodes.push(<a href={match[3]} key={`link-${match.index}`} target="_blank" rel="noreferrer">{match[2]}</a>);
+    } else if (match[4]) {
+      nodes.push(<code key={`code-${match.index}`}>{match[4]}</code>);
+    } else if (match[5]) {
+      nodes.push(<strong key={`strong-${match.index}`}>{match[5]}</strong>);
+    } else if (match[6]) {
+      nodes.push(<em key={`em-${match.index}`}>{match[6]}</em>);
+    }
+    lastIndex = pattern.lastIndex;
+  }
+
+  if (lastIndex < text.length) nodes.push(text.slice(lastIndex));
+  return nodes;
+}
+
+function MarkdownContent({ source }: { source: string }) {
+  const lines = source.replace(/^---[\s\S]*?---\s*/u, "").split(/\r?\n/);
+  const blocks: ReactNode[] = [];
+  let paragraph: string[] = [];
+
+  const flushParagraph = () => {
+    if (paragraph.length) {
+      blocks.push(<p key={`paragraph-${blocks.length}`}>{renderInlineMarkdown(paragraph.join(" "))}</p>);
+      paragraph = [];
+    }
+  };
+
+  let index = 0;
+  while (index < lines.length) {
+    const line = lines[index];
+    if (!line.trim()) {
+      flushParagraph();
+      index += 1;
+      continue;
+    }
+
+    const heading = line.match(/^(#{1,3})\s+(.+)$/);
+    if (heading) {
+      flushParagraph();
+      const Heading = `h${heading[1].length}` as "h1" | "h2" | "h3";
+      blocks.push(<Heading key={`heading-${index}`}>{renderInlineMarkdown(heading[2])}</Heading>);
+      index += 1;
+      continue;
+    }
+
+    if (line.startsWith(">")) {
+      flushParagraph();
+      const quoteLines: string[] = [];
+      while (index < lines.length && lines[index].startsWith(">")) {
+        quoteLines.push(lines[index].replace(/^>\s?/, ""));
+        index += 1;
+      }
+      blocks.push(<blockquote key={`quote-${index}`}>{renderInlineMarkdown(quoteLines.join(" "))}</blockquote>);
+      continue;
+    }
+
+    if (line.startsWith("```")) {
+      flushParagraph();
+      const language = line.slice(3).trim();
+      const codeLines: string[] = [];
+      index += 1;
+      while (index < lines.length && !lines[index].startsWith("```")) {
+        codeLines.push(lines[index]);
+        index += 1;
+      }
+      index += 1;
+      blocks.push(<pre key={`code-block-${index}`} data-language={language || undefined}><code>{codeLines.join("\n")}</code></pre>);
+      continue;
+    }
+
+    if (/^([-*])\s+/.test(line)) {
+      flushParagraph();
+      const items: string[] = [];
+      while (index < lines.length && /^([-*])\s+/.test(lines[index])) {
+        items.push(lines[index].replace(/^[-*]\s+/, ""));
+        index += 1;
+      }
+      blocks.push(<ul key={`list-${index}`}>{items.map((item, itemIndex) => <li key={`${index}-${itemIndex}`}>{renderInlineMarkdown(item)}</li>)}</ul>);
+      continue;
+    }
+
+    if (/^\d+\.\s+/.test(line)) {
+      flushParagraph();
+      const items: string[] = [];
+      while (index < lines.length && /^\d+\.\s+/.test(lines[index])) {
+        items.push(lines[index].replace(/^\d+\.\s+/, ""));
+        index += 1;
+      }
+      blocks.push(<ol key={`ordered-list-${index}`}>{items.map((item, itemIndex) => <li key={`${index}-${itemIndex}`}>{renderInlineMarkdown(item)}</li>)}</ol>);
+      continue;
+    }
+
+    const image = line.match(/^!\[([^\]]*)\]\(([^)]+)\)$/);
+    if (image) {
+      flushParagraph();
+      blocks.push(<figure key={`image-${index}`}><img src={image[2]} alt={image[1]} /><figcaption>{image[1]}</figcaption></figure>);
+      index += 1;
+      continue;
+    }
+
+    if (/^---+$/.test(line.trim())) {
+      flushParagraph();
+      blocks.push(<hr key={`rule-${index}`} />);
+      index += 1;
+      continue;
+    }
+
+    paragraph.push(line);
+    index += 1;
+  }
+  flushParagraph();
+
+  return <div className="markdown-content">{blocks}</div>;
+}
+
+function ArticlePage() {
+  const [source, setSource] = useState("");
+  const [status, setStatus] = useState<"loading" | "ready" | "error">("loading");
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/articles/first-note.md")
+      .then((response) => {
+        if (!response.ok) throw new Error("article request failed");
+        return response.text();
+      })
+      .then((markdown) => {
+        if (!cancelled) {
+          setSource(markdown);
+          setStatus("ready");
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setStatus("error");
+      });
+
+    return () => { cancelled = true; };
+  }, []);
+
+  return (
+    <div className="article-page">
+      <div className="article-stack">
+        <div className="article-cover-space" aria-label="文章头图预留区域">
+          <div className="article-cover-space__label">Article / Cover image</div>
+          <div className="article-cover-space__hint">Reserved space for a wide image</div>
+        </div>
+        <article className="glass-card article-card">
+          <div className="article-card__meta"><span>04 / Article</span><span>Markdown document</span></div>
+          {status === "loading" ? <p className="article-state">正在读取 Markdown…</p> : null}
+          {status === "error" ? <p className="article-state">暂时无法读取文章内容，请检查 Markdown 文件。</p> : null}
+          {status === "ready" ? <MarkdownContent source={source} /> : null}
+        </article>
+      </div>
+    </div>
+  );
+}
+
 export default function Home() {
   const [activePage, setActivePage] = useState<PageKey>("home");
   const now = useCurrentTime();
@@ -494,15 +661,16 @@ export default function Home() {
         </div>
       </header>
 
-      <ClockDisplay now={now} />
+      {activePage !== "article" ? <ClockDisplay now={now} /> : null}
 
       <div className="workspace-shell shell">
         {activePage === "home" && <HomePage onPageChange={setActivePage} now={now} />}
         {activePage === "projects" && <ProjectsPage />}
         {activePage === "about" && <AboutPage />}
+        {activePage === "article" && <ArticlePage />}
       </div>
 
-      <footer className="site-footer shell"><span>© 2026 Your Name</span><span>Made with patience &amp; curiosity.</span><span>v.01</span></footer>
+      {activePage !== "article" ? <footer className="site-footer shell"><span>© 2026 Your Name</span><span>Made with patience &amp; curiosity.</span><span>v.01</span></footer> : null}
     </main>
   );
 }
