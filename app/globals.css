@@ -138,7 +138,7 @@ button:focus-visible { outline: 2px solid var(--mint); outline-offset: 3px; }
 .music-bar__track-info { display: flex; align-items: center; gap: 12px; min-width: 0; }
 .music-player-block--compact .music-bar__track-info { flex-direction: column; justify-content: center; gap: 10px; text-align: center; }
 .music-bar__track-info > div:last-child { display: grid; min-width: 0; gap: 5px; }
-.music-player-block--compact .music-bar__track-label { display: flex; align-items: baseline; justify-content: center; gap: 0; max-width: 100%; white-space: nowrap; }
+.music-player-block--compact .music-bar__track-label { display: flex; order: -1; align-items: baseline; justify-content: center; gap: 0; max-width: 100%; white-space: nowrap; }
 .music-player-block--compact .music-bar__track-label strong, .music-player-block--compact .music-bar__track-label small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .music-player-block--compact .music-bar__track-label strong { max-width: 62%; }
 .music-player-block--compact .music-bar__track-label small { max-width: 34%; }
@@ -146,7 +146,7 @@ button:focus-visible { outline: 2px solid var(--mint); outline-offset: 3px; }
 .music-bar__track-info strong { overflow: hidden; color: var(--text); font-size: 15px; font-weight: 550; letter-spacing: -.03em; text-overflow: ellipsis; white-space: nowrap; }
 .music-bar__track-info small { overflow: hidden; color: var(--muted); font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
 .music-bar__cover { display: grid; width: 56px; height: 56px; flex: 0 0 auto; place-items: center; border: 1px solid rgb(255 255 255 / .16); border-radius: 50%; background: repeating-radial-gradient(circle at center, #c5a0c2 0 5px, #5d617d 6px 9px, #25293a 10px 13px); background-position: center; background-size: cover; color: rgb(255 255 255 / .85); font-family: Georgia, serif; font-size: 22px; box-shadow: 0 0 22px rgb(255 63 97 / .2); }
-.music-player-block--compact .music-bar__cover { width: 84px; height: 84px; }
+.music-player-block--compact .music-bar__cover { width: 100px; height: 100px; }
 .music-bar__cover.is-playing { animation: music-disc-spin 18s linear infinite; }
 .music-bar__center { display: grid; justify-items: center; gap: 6px; }
 .music-player-block--compact .music-bar__center { margin-top: 9px; }
