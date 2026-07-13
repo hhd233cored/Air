@@ -6,6 +6,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
@@ -30,6 +31,11 @@ public class ApiExceptionHandler {
         Map<String, String> details = new LinkedHashMap<>();
         exception.getBindingResult().getFieldErrors().forEach(field -> details.putIfAbsent(field.getField(), field.getDefaultMessage()));
         return error(HttpStatus.BAD_REQUEST, "VALIDATION_ERROR", "Request validation failed", request, details);
+    }
+
+    @ExceptionHandler(MethodArgumentTypeMismatchException.class)
+    public ResponseEntity<ApiError> typeMismatch(MethodArgumentTypeMismatchException exception, HttpServletRequest request) {
+        return error(HttpStatus.BAD_REQUEST, "INVALID_PARAMETER", "Invalid request parameter", request, Map.of());
     }
 
     @ExceptionHandler(IllegalArgumentException.class)
