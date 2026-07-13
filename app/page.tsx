@@ -130,7 +130,9 @@ function useLocalWeather() {
           const locationResponse = await fetch(locationUrl);
           const locationPayload = await locationResponse.json() as { address?: Record<string, string> };
           const address = locationPayload.address;
-          location = address?.city ?? address?.town ?? address?.county ?? address?.state ?? location;
+          const city = address?.city ?? address?.municipality ?? address?.state;
+          const district = address?.district ?? address?.county ?? address?.town;
+          location = [city, district].filter((part, index, parts) => part && parts.indexOf(part) === index).join(" ") || location;
         } catch {
           // Weather still works when reverse geocoding is unavailable.
         }
@@ -211,6 +213,7 @@ function GlassHeader({ eyebrow, title, copy }: { eyebrow: string; title: string;
 }
 
 function CalendarCard({ now }: { now: Date | null }) {
+  const { weather, status: weatherStatus } = useLocalWeather();
   const today = now ?? new Date(2026, 6, 13);
   const [viewDate, setViewDate] = useState<Date | null>(null);
   const reference = viewDate ?? today;
@@ -229,6 +232,14 @@ function CalendarCard({ now }: { now: Date | null }) {
   const changeMonth = (offset: number) => {
     setViewDate(new Date(year, monthIndex + offset, 1));
   };
+  const weatherSummary = weather ? getWeatherSummary(weather.code) : { label: "天气", icon: "◌" };
+  const weatherStatusCopy = weatherStatus === "loading"
+    ? "正在请求位置授权…"
+    : weatherStatus === "denied"
+      ? "允许定位后显示当地天气"
+      : weatherStatus === "unsupported"
+        ? "当前浏览器不支持定位"
+        : "天气服务暂时不可用";
 
   return (
     <article className="glass-card calendar-card dashboard-card">
@@ -248,42 +259,15 @@ function CalendarCard({ now }: { now: Date | null }) {
           );
         })}
       </div>
-      <div className="calendar-card__footer"><span>Today&apos;s page</span><span>{reference.getFullYear()}</span></div>
-    </article>
-  );
-}
-
-function WeatherCard() {
-  const { weather, status } = useLocalWeather();
-  const summary = weather ? getWeatherSummary(weather.code) : { label: "天气", icon: "◌" };
-  const statusCopy = status === "loading"
-    ? "正在请求位置授权…"
-    : status === "denied"
-      ? "允许定位后显示当地天气"
-      : status === "unsupported"
-        ? "当前浏览器不支持定位"
-        : "天气服务暂时不可用";
-
-  return (
-    <article className="glass-card weather-card dashboard-card">
-      <div className="card-heading">
-        <div>
-          <p className="card-kicker">02 / Local weather</p>
-          <h2>{weather?.location ?? "你所在的地方"}</h2>
+      <div className="calendar-weather">
+        <div className="calendar-weather__place">
+          <span className="calendar-weather__icon" aria-hidden="true">{weatherSummary.icon}</span>
+          <div><strong>{weather?.location ?? "你所在的地方"}</strong><small>{weather ? weatherSummary.label : weatherStatusCopy}</small></div>
         </div>
-        <span className="weather-icon" aria-hidden="true">{summary.icon}</span>
+        {weather ? (
+          <div className="calendar-weather__reading"><strong>{Math.round(weather.temperature)}°</strong><small>体感 {Math.round(weather.apparentTemperature)}° · 湿度 {weather.humidity}% · 风 {Math.round(weather.windSpeed)}km/h</small></div>
+        ) : null}
       </div>
-      {weather ? (
-        <>
-          <div className="weather-main">
-            <strong>{Math.round(weather.temperature)}°</strong>
-            <div><span>{summary.label}</span><small>体感 {Math.round(weather.apparentTemperature)}°</small></div>
-          </div>
-          <div className="weather-meta"><span>湿度 {weather.humidity}%</span><span>风速 {Math.round(weather.windSpeed)} km/h</span></div>
-        </>
-      ) : (
-        <div className="weather-placeholder"><span className="status-dot" />{statusCopy}</div>
-      )}
     </article>
   );
 }
@@ -320,8 +304,6 @@ function HomePage({ onPageChange, now }: { onPageChange: (page: PageKey) => void
         </article>
 
         <CalendarCard now={now} />
-
-        <WeatherCard />
 
         <article className="glass-card quote-card dashboard-card">
           <span className="quote-mark">“</span>

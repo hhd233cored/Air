@@ -120,16 +120,15 @@ button:focus-visible { outline: 2px solid var(--mint); outline-offset: 3px; }
 .calendar-day.is-today small { color: rgb(255 255 255 / .86); }
 .calendar-day.has-event::after { position: absolute; right: 4px; top: 4px; width: 4px; height: 4px; border-radius: 50%; background: var(--peach); content: ""; }
 .calendar-day.is-today.has-event::after { background: white; }
-.calendar-card__footer { display: flex; align-items: center; justify-content: space-between; margin-top: auto; padding: 15px 20px 18px; border-top: 1px solid rgb(104 90 135 / .12); color: var(--faint); font-family: var(--font-geist-mono), Consolas, monospace; font-size: 8px; text-transform: uppercase; }
-.calendar-card__footer span:last-child { color: var(--peach); font-size: 10px; }
-.weather-card { grid-column: 9 / -1; min-height: 218px; background: linear-gradient(145deg, rgb(220 247 242 / .72), rgb(255 255 255 / .58)); }
-.weather-icon { display: grid; width: 42px; height: 42px; place-items: center; border: 1px solid rgb(79 157 150 / .2); border-radius: 14px; background: rgb(255 255 255 / .42); color: var(--mint); font-size: 19px; }
-.weather-main { display: flex; align-items: center; gap: 15px; margin: 24px 0 18px; }
-.weather-main > strong { color: var(--text); font-size: 48px; font-weight: 400; letter-spacing: -.08em; line-height: .9; }
-.weather-main div { display: grid; gap: 6px; color: var(--text); font-size: 13px; }
-.weather-main small { color: var(--muted); font-size: 9px; }
-.weather-meta { display: flex; justify-content: space-between; gap: 8px; padding-top: 13px; border-top: 1px solid rgb(104 90 135 / .12); color: var(--muted); font-family: var(--font-geist-mono), Consolas, monospace; font-size: 8px; }
-.weather-placeholder { display: flex; align-items: center; gap: 10px; min-height: 112px; color: var(--muted); font-size: 11px; line-height: 1.6; }
+.calendar-weather { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 57px; padding: 9px 15px 11px; border-top: 1px solid rgb(104 90 135 / .12); background: rgb(255 255 255 / .24); }
+.calendar-weather__place, .calendar-weather__reading { display: flex; align-items: center; min-width: 0; }
+.calendar-weather__place { gap: 8px; }
+.calendar-weather__place div { display: grid; min-width: 0; gap: 3px; }
+.calendar-weather__place strong { overflow: hidden; color: var(--text); font-size: 10px; font-weight: 550; text-overflow: ellipsis; white-space: nowrap; }
+.calendar-weather__place small, .calendar-weather__reading small { color: var(--muted); font-family: var(--font-geist-mono), Consolas, monospace; font-size: 7px; line-height: 1.35; }
+.calendar-weather__icon { display: grid; width: 24px; height: 24px; flex: 0 0 auto; place-items: center; border: 1px solid rgb(79 157 150 / .2); border-radius: 8px; background: rgb(255 255 255 / .42); color: var(--mint); font-size: 11px; }
+.calendar-weather__reading { max-width: 52%; flex-direction: column; align-items: end; gap: 3px; text-align: right; }
+.calendar-weather__reading strong { color: var(--text); font-size: 19px; font-weight: 450; letter-spacing: -.06em; line-height: .9; }
 .quote-card { grid-column: 1 / -1; display: flex; align-items: center; gap: 18px; min-height: 80px; padding-block: 14px; background: rgb(255 255 255 / .43); }
 .quote-mark { color: var(--accent); font-family: Georgia, serif; font-size: 45px; line-height: .7; }
 .quote-card p { margin: 0; color: var(--text); font-size: 18px; letter-spacing: -.04em; }
@@ -200,7 +199,6 @@ button:focus-visible { outline: 2px solid var(--mint); outline-offset: 3px; }
   .header-status { display: none; }
   .dashboard-card--profile { grid-column: span 7; }
   .player-card, .calendar-card { grid-column: span 5; }
-  .weather-card { grid-column: 8 / -1; }
   .photo-card { grid-column: span 5; }
   .feed-column { grid-column: span 7; }
 }
@@ -219,7 +217,7 @@ button:focus-visible { outline: 2px solid var(--mint); outline-offset: 3px; }
   .page-copy { max-width: none; }
   .clock-display__date { flex-wrap: wrap; gap: 7px 10px; }
   .dashboard-grid { grid-template-columns: 1fr; gap: 13px; }
-  .dashboard-card--profile, .player-card, .calendar-card, .weather-card, .quote-card, .photo-card, .feed-column, .stats-card { grid-column: auto; }
+  .dashboard-card--profile, .player-card, .calendar-card, .quote-card, .photo-card, .feed-column, .stats-card { grid-column: auto; }
   .dashboard-card--profile, .player-card, .calendar-card { min-height: 240px; }
   .profile-main { gap: 16px; }
   .profile-main h2 { font-size: 34px; }
