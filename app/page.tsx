@@ -72,7 +72,7 @@ function getCalendarDetail(date: Date) {
     ?? lunarFestivals[`${lunarMonthNumber}-${lunarParts.day}`]
     ?? (lunarMonthNumber === 12 && nextLunarMonthNumber === 1 && nextLunar.day === 1 ? "除夕" : undefined);
 
-  return { lunar, event };
+  return { lunar, lunarDay: lunarDayNames[lunarParts.day] ?? `${lunarParts.day}日`, event };
 }
 
 type WeatherState = {
@@ -254,7 +254,7 @@ function CalendarCard({ now }: { now: Date | null }) {
           const detail = day ? getCalendarDetail(new Date(year, monthIndex, day)) : undefined;
           return (
             <span className={`calendar-day ${isViewingToday && day === today.getDate() ? "is-today" : ""} ${detail?.event ? "has-event" : ""}`} key={`${day ?? "empty"}-${index}`} title={detail?.event}>
-              {day ? <><b>{day}</b><small>{detail?.event ?? detail?.lunar ?? ""}</small></> : null}
+              {day ? <><b>{day}</b><small>{detail?.event ?? detail?.lunarDay ?? ""}</small></> : null}
             </span>
           );
         })}
