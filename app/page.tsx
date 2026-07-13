@@ -18,10 +18,14 @@ const projects = [
 
 type MusicTrack = { title: string; artist: string; cover: string; src: string };
 
-// Replace this placeholder with tracks returned by your playlist source.
-const musicTracks: MusicTrack[] = [
-  { title: "Your soundtrack", artist: "等待接入网易云歌单", cover: "", src: "" },
-];
+const netEasePlaylist = {
+  id: "17434435787",
+  url: "https://music.163.com/playlist?id=17434435787&uct2=U2FsdGVkX1/aYcJTaeB05yIdBqaMhTtFRVoB4Mt6mAg=",
+};
+
+// Playlist tracks will be populated after the playlist API/proxy is connected.
+const musicTracks: MusicTrack[] = [];
+const emptyMusicTrack: MusicTrack = { title: "未选择歌曲", artist: "网易云音乐歌单", cover: "", src: "" };
 
 const lunarDayNames = ["", "初一", "初二", "初三", "初四", "初五", "初六", "初七", "初八", "初九", "初十", "十一", "十二", "十三", "十四", "十五", "十六", "十七", "十八", "十九", "二十", "廿一", "廿二", "廿三", "廿四", "廿五", "廿六", "廿七", "廿八", "廿九", "三十"];
 
@@ -286,14 +290,16 @@ function formatMusicTime(seconds: number) {
   return `${minutes}:${remainingSeconds}`;
 }
 
-function MusicPlayerCard() {
+function MusicPlayerBar() {
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const [trackIndex, setTrackIndex] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const [volume, setVolume] = useState(0.72);
-  const track = musicTracks[trackIndex] ?? musicTracks[0];
+  const [showVolume, setShowVolume] = useState(false);
+  const [showPlaylist, setShowPlaylist] = useState(false);
+  const track = musicTracks[trackIndex] ?? emptyMusicTrack;
 
   useEffect(() => {
     const audio = audioRef.current;
@@ -309,6 +315,7 @@ function MusicPlayerCard() {
   }, [volume]);
 
   const changeTrack = (offset: number) => {
+    if (!musicTracks.length) return;
     setTrackIndex((index) => (index + offset + musicTracks.length) % musicTracks.length);
   };
 
@@ -326,26 +333,34 @@ function MusicPlayerCard() {
   };
 
   return (
-    <article className="glass-card music-card dashboard-card">
-      <div className="card-topline"><span>03 / Music</span><span>{isPlaying ? "Playing" : "Paused"}</span></div>
-      <div className="music-card__heading"><h2>{track.title}</h2><p>{track.artist}</p></div>
-      <div className={`music-disc ${isPlaying ? "is-playing" : ""}`} style={track.cover ? { backgroundImage: `url(${track.cover})` } : undefined}>
-        <span className="music-disc__label">{track.cover ? "" : "YN"}</span>
-        <span className="music-disc__hole" />
-      </div>
-      <div className="music-progress">
-        <input aria-label="播放进度" type="range" min="0" max={duration || 0} step="0.1" value={Math.min(currentTime, duration || 0)} onChange={(event) => seek(Number(event.target.value))} disabled={!duration} />
-        <div><span>{formatMusicTime(currentTime)}</span><span>{formatMusicTime(duration)}</span></div>
-      </div>
-      <div className="music-controls">
-        <button type="button" aria-label="上一首" onClick={() => changeTrack(-1)}>◀◀</button>
-        <button className="music-play-button" type="button" aria-label={isPlaying ? "暂停" : "播放"} onClick={togglePlayback} disabled={!track.src}>{isPlaying ? "Ⅱ" : "▶"}</button>
-        <button type="button" aria-label="下一首" onClick={() => changeTrack(1)}>▶▶</button>
-        <label className="music-volume" aria-label="音量"><span>◖</span><input type="range" min="0" max="1" step="0.01" value={volume} onChange={(event) => setVolume(Number(event.target.value))} /></label>
-      </div>
-      {!track.src ? <p className="music-card__hint">提供网易云歌单后，这里会载入歌曲与专辑封面。</p> : null}
-      <audio ref={audioRef} src={track.src || undefined} preload="metadata" onPlay={() => setIsPlaying(true)} onPause={() => setIsPlaying(false)} onEnded={() => changeTrack(1)} onLoadedMetadata={(event) => setDuration(event.currentTarget.duration)} onTimeUpdate={(event) => setCurrentTime(event.currentTarget.currentTime)} />
-    </article>
+    <div className="music-player-block">
+      <article className="music-player-bar">
+        <div className="music-bar-progress">
+          <input aria-label="播放进度" type="range" min="0" max={duration || 0} step="0.1" value={Math.min(currentTime, duration || 0)} onChange={(event) => seek(Number(event.target.value))} disabled={!duration} />
+        </div>
+        <div className="music-bar__track-info">
+          <div className={`music-bar__cover ${isPlaying ? "is-playing" : ""}`} style={track.cover ? { backgroundImage: `url(${track.cover})` } : undefined}><span>♪</span></div>
+          <div><strong>{track.title}</strong><small>{track.artist}</small></div>
+        </div>
+        <div className="music-bar__center">
+          <div className="music-bar__transport">
+            <button type="button" aria-label="随机播放">⤨</button>
+            <button type="button" aria-label="上一首" onClick={() => changeTrack(-1)} disabled={!musicTracks.length}>◀</button>
+            <button className="music-bar__play" type="button" aria-label={isPlaying ? "暂停" : "播放"} onClick={togglePlayback} disabled={!track.src}>{isPlaying ? "Ⅱ" : "▶"}</button>
+            <button type="button" aria-label="下一首" onClick={() => changeTrack(1)} disabled={!musicTracks.length}>▶</button>
+            <button type="button" aria-label="显示歌单" aria-expanded={showPlaylist} onClick={() => { setShowPlaylist((visible) => !visible); setShowVolume(false); }}>☷</button>
+          </div>
+          <div className="music-bar__time"><span>{formatMusicTime(currentTime)}</span><span>{formatMusicTime(duration)}</span></div>
+        </div>
+        <div className="music-bar__actions">
+          <button type="button" aria-label="显示音量" aria-expanded={showVolume} onClick={() => { setShowVolume((visible) => !visible); setShowPlaylist(false); }}>◖</button>
+          <button type="button" aria-label="打开网易云歌单" onClick={() => window.open(netEasePlaylist.url, "_blank", "noopener,noreferrer")}>↗</button>
+        </div>
+        <audio ref={audioRef} src={track.src || undefined} preload="metadata" onPlay={() => setIsPlaying(true)} onPause={() => setIsPlaying(false)} onEnded={() => changeTrack(1)} onLoadedMetadata={(event) => setDuration(event.currentTarget.duration)} onTimeUpdate={(event) => setCurrentTime(event.currentTarget.currentTime)} />
+      </article>
+      {showVolume ? <div className="music-popover music-volume-popover"><span>音量</span><input aria-label="音量" type="range" min="0" max="1" step="0.01" value={volume} onChange={(event) => setVolume(Number(event.target.value))} /></div> : null}
+      {showPlaylist ? <div className="music-popover music-playlist-popover"><div><strong>网易云歌单</strong><small>ID {netEasePlaylist.id}</small></div><a href={netEasePlaylist.url} target="_blank" rel="noreferrer">打开歌单 ↗</a><p>歌单界面已隐藏，接入歌曲数据后会在这里展开。</p></div> : null}
+    </div>
   );
 }
 
@@ -371,7 +386,7 @@ function HomePage({ onPageChange, now }: { onPageChange: (page: PageKey) => void
 
         <CalendarCard now={now} />
 
-        <MusicPlayerCard />
+        <MusicPlayerBar />
 
         <div className="feed-column">
           <article className="glass-card posts-card dashboard-card">
