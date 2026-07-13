@@ -185,19 +185,23 @@ export default function Home() {
       <div className="ambient ambient--one" aria-hidden="true" />
       <div className="ambient ambient--two" aria-hidden="true" />
       <div className="ambient ambient--three" aria-hidden="true" />
-      <div className="cover-space shell" aria-label="顶部图片预留区域">
+      <div className="cover-space" aria-label="顶部图片预留区域">
         <div className="cover-space__inner">
-          <span className="cover-space__label">01 / Cover image</span>
-          <span className="cover-space__hint">Reserved space for your future image</span>
+          <div className="cover-space__content shell">
+            <span className="cover-space__label">01 / Cover image</span>
+            <span className="cover-space__hint">Reserved space for your future image</span>
+          </div>
         </div>
       </div>
-      <header className="site-header shell">
+      <header className="site-header">
+        <div className="site-header__inner shell">
         <div className="brand"><span className="brand-mark">✦</span><span>YOUR <i>/</i> SPACE</span></div>
         <div className="search-pill"><span>⌕</span><span>Search this space...</span><kbd>⌘ K</kbd></div>
         <nav className="page-nav" aria-label="页面切换">
           {navigation.map((item) => <PageButton key={item.id} active={activePage === item.id} index={item.index} label={item.label} onClick={() => setActivePage(item.id)} />)}
         </nav>
         <div className="header-status"><span className="status-dot" /> <span>Online-ish</span></div>
+        </div>
       </header>
 
       <div className="workspace-shell shell">
