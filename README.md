@@ -20,10 +20,11 @@ This starter does not use `wrangler.jsonc`.
 
 ## Included Shape
 
-- edit site code under `app/`
+- edit frontend site code under `app/`
+- add backend APIs and services under `backend/`
 - `.openai/hosting.json` declares optional Sites D1 and R2 bindings
 - `vite.config.ts` simulates declared bindings for local development
-- `db/schema.ts` starts intentionally empty
+- `backend/db/schema.ts` starts intentionally empty
 - `examples/d1/` contains an optional D1 example surface
 - `drizzle.config.ts` supports local migration generation when needed
 
