@@ -291,7 +291,7 @@ function formatMusicTime(seconds: number) {
   return `${minutes}:${remainingSeconds}`;
 }
 
-function MusicPlayerBar() {
+function MusicPlayerBar({ compact = false }: { compact?: boolean }) {
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const [trackIndex, setTrackIndex] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -334,7 +334,7 @@ function MusicPlayerBar() {
   };
 
   return (
-    <div className="music-player-block">
+    <div className={`music-player-block ${compact ? "music-player-block--compact" : ""}`}>
       <article className="music-player-bar">
         {duration > 0 ? (
           <div className="music-bar-progress">
@@ -387,19 +387,9 @@ function HomePage({ onPageChange, now }: { onPageChange: (page: PageKey) => void
           </div>
         </article>
 
+        <MusicPlayerBar compact />
+
         <CalendarCard now={now} />
-
-        <MusicPlayerBar />
-
-        <article className="glass-card stats-card dashboard-card">
-          <div className="card-heading"><div><p className="card-kicker">07 / Site dashboard</p><h2>A few numbers, just for fun.</h2></div><span className="dashboard-badge">LIVE-ISH</span></div>
-          <div className="stat-list">
-            <div><strong>12</strong><span>Projects</span></div>
-            <div><strong>48</strong><span>Notes</span></div>
-            <div><strong>2.4k</strong><span>Little visits</span></div>
-            <div><strong>∞</strong><span>Ideas left</span></div>
-          </div>
-        </article>
 
         <div className="feed-column">
           <article className="glass-card posts-card dashboard-card">
