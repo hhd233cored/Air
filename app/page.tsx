@@ -75,6 +75,90 @@ function getCalendarDetail(date: Date) {
   return { lunar, event };
 }
 
+type WeatherState = {
+  location: string;
+  temperature: number;
+  apparentTemperature: number;
+  humidity: number;
+  windSpeed: number;
+  code: number;
+};
+
+type WeatherStatus = "loading" | "ready" | "denied" | "error" | "unsupported";
+
+function getWeatherSummary(code: number) {
+  if (code === 0) return { label: "晴", icon: "☀" };
+  if (code <= 3) return { label: "多云", icon: "☁" };
+  if (code === 45 || code === 48) return { label: "有雾", icon: "≋" };
+  if (code <= 57) return { label: "毛毛雨", icon: "◌" };
+  if (code <= 67 || code === 80 || code === 81 || code === 82) return { label: "有雨", icon: "雨" };
+  if (code <= 77 || code === 85 || code === 86) return { label: "有雪", icon: "雪" };
+  if (code >= 95) return { label: "雷雨", icon: "⚡" };
+  return { label: "天气良好", icon: "◌" };
+}
+
+function useLocalWeather() {
+  const [weather, setWeather] = useState<WeatherState | null>(null);
+  const [status, setStatus] = useState<WeatherStatus>("loading");
+
+  useEffect(() => {
+    let cancelled = false;
+
+    if (!navigator.geolocation) {
+      setStatus("unsupported");
+      return () => { cancelled = true; };
+    }
+
+    navigator.geolocation.getCurrentPosition(async ({ coords }) => {
+      try {
+        const weatherUrl = new URL("https://api.open-meteo.com/v1/forecast");
+        weatherUrl.search = new URLSearchParams({
+          latitude: String(coords.latitude),
+          longitude: String(coords.longitude),
+          current: "temperature_2m,relative_humidity_2m,apparent_temperature,weather_code,wind_speed_10m",
+          timezone: "auto",
+        }).toString();
+        const weatherResponse = await fetch(weatherUrl);
+        if (!weatherResponse.ok) throw new Error("weather request failed");
+        const weatherPayload = await weatherResponse.json() as { current?: Record<string, number> };
+        if (!weatherPayload.current) throw new Error("weather data missing");
+
+        let location = "当前位置";
+        try {
+          const locationUrl = new URL("https://nominatim.openstreetmap.org/reverse");
+          locationUrl.search = new URLSearchParams({ lat: String(coords.latitude), lon: String(coords.longitude), format: "jsonv2", "accept-language": "zh-CN" }).toString();
+          const locationResponse = await fetch(locationUrl);
+          const locationPayload = await locationResponse.json() as { address?: Record<string, string> };
+          const address = locationPayload.address;
+          location = address?.city ?? address?.town ?? address?.county ?? address?.state ?? location;
+        } catch {
+          // Weather still works when reverse geocoding is unavailable.
+        }
+
+        if (!cancelled) {
+          setWeather({
+            location,
+            temperature: weatherPayload.current.temperature_2m,
+            apparentTemperature: weatherPayload.current.apparent_temperature,
+            humidity: weatherPayload.current.relative_humidity_2m,
+            windSpeed: weatherPayload.current.wind_speed_10m,
+            code: weatherPayload.current.weather_code,
+          });
+          setStatus("ready");
+        }
+      } catch {
+        if (!cancelled) setStatus("error");
+      }
+    }, () => {
+      if (!cancelled) setStatus("denied");
+    }, { enableHighAccuracy: false, maximumAge: 900000, timeout: 10000 });
+
+    return () => { cancelled = true; };
+  }, []);
+
+  return { weather, status };
+}
+
 function PageButton({ active, index, label, onClick }: { active: boolean; index: string; label: string; onClick: () => void }) {
   return (
     <button className={`page-button ${active ? "is-active" : ""}`} onClick={onClick} type="button" aria-current={active ? "page" : undefined}>
@@ -98,17 +182,18 @@ function useCurrentTime() {
 }
 
 function ClockDisplay({ now }: { now: Date | null }) {
-  const time = now
-    ? new Intl.DateTimeFormat("zh-CN", { hour: "2-digit", minute: "2-digit", hour12: false }).format(now)
-    : "--:--";
-  const date = now
-    ? new Intl.DateTimeFormat("zh-CN", { year: "numeric", month: "long", day: "numeric", weekday: "long" }).format(now)
-    : "正在读取日期";
+  const time = now ? new Intl.DateTimeFormat("zh-CN", { hour: "2-digit", minute: "2-digit", hour12: false }).format(now) : "--:--";
+  const gregorianDate = now ? new Intl.DateTimeFormat("zh-CN", { year: "numeric", month: "long", day: "numeric" }).format(now) : "正在读取日期";
+  const weekday = now ? new Intl.DateTimeFormat("zh-CN", { weekday: "long" }).format(now) : "正在读取星期";
+  const lunarParts = now ? getLunarParts(now) : null;
+  const lunarDate = lunarParts ? `农历${lunarParts.month}${lunarDayNames[lunarParts.day] ?? `${lunarParts.day}日`}` : "正在读取农历";
 
   return (
     <section className="clock-display" aria-label="当前时间">
       <div className="clock-display__time">{time}</div>
-      <div className="clock-display__date">{date}</div>
+      <div className="clock-display__date">
+        <span>{gregorianDate}</span><i>/</i><span>{weekday}</span><i>/</i><span>{lunarDate}</span>
+      </div>
     </section>
   );
 }
@@ -148,12 +233,9 @@ function CalendarCard({ now }: { now: Date | null }) {
   return (
     <article className="glass-card calendar-card dashboard-card">
       <div className="calendar-card__month">
+        <button className="calendar-nav-button" type="button" onClick={() => changeMonth(-1)} aria-label="查看上个月" title="上个月">‹</button>
         <span>{month}</span>
-        <div className="calendar-card__controls">
-          <button className="calendar-nav-button" type="button" onClick={() => changeMonth(-1)} aria-label="查看上个月" title="上个月">‹</button>
-          <small>Monthly view</small>
-          <button className="calendar-nav-button" type="button" onClick={() => changeMonth(1)} aria-label="查看下个月" title="下个月">›</button>
-        </div>
+        <button className="calendar-nav-button" type="button" onClick={() => changeMonth(1)} aria-label="查看下个月" title="下个月">›</button>
       </div>
       <div className="calendar-grid">
         {weekdays.map((weekday) => <span className="calendar-weekday" key={weekday}>{weekday}</span>)}
@@ -167,6 +249,41 @@ function CalendarCard({ now }: { now: Date | null }) {
         })}
       </div>
       <div className="calendar-card__footer"><span>Today&apos;s page</span><span>{reference.getFullYear()}</span></div>
+    </article>
+  );
+}
+
+function WeatherCard() {
+  const { weather, status } = useLocalWeather();
+  const summary = weather ? getWeatherSummary(weather.code) : { label: "天气", icon: "◌" };
+  const statusCopy = status === "loading"
+    ? "正在请求位置授权…"
+    : status === "denied"
+      ? "允许定位后显示当地天气"
+      : status === "unsupported"
+        ? "当前浏览器不支持定位"
+        : "天气服务暂时不可用";
+
+  return (
+    <article className="glass-card weather-card dashboard-card">
+      <div className="card-heading">
+        <div>
+          <p className="card-kicker">02 / Local weather</p>
+          <h2>{weather?.location ?? "你所在的地方"}</h2>
+        </div>
+        <span className="weather-icon" aria-hidden="true">{summary.icon}</span>
+      </div>
+      {weather ? (
+        <>
+          <div className="weather-main">
+            <strong>{Math.round(weather.temperature)}°</strong>
+            <div><span>{summary.label}</span><small>体感 {Math.round(weather.apparentTemperature)}°</small></div>
+          </div>
+          <div className="weather-meta"><span>湿度 {weather.humidity}%</span><span>风速 {Math.round(weather.windSpeed)} km/h</span></div>
+        </>
+      ) : (
+        <div className="weather-placeholder"><span className="status-dot" />{statusCopy}</div>
+      )}
     </article>
   );
 }
@@ -203,6 +320,8 @@ function HomePage({ onPageChange, now }: { onPageChange: (page: PageKey) => void
         </article>
 
         <CalendarCard now={now} />
+
+        <WeatherCard />
 
         <article className="glass-card quote-card dashboard-card">
           <span className="quote-mark">“</span>
