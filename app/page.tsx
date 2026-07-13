@@ -391,31 +391,6 @@ function HomePage({ onPageChange, now }: { onPageChange: (page: PageKey) => void
 
         <MusicPlayerBar />
 
-        <div className="feed-column">
-          <article className="glass-card posts-card dashboard-card">
-            <div className="card-heading"><div><p className="card-kicker">04 / Notes</p><h2>Latest thoughts</h2></div><span className="round-arrow">→</span></div>
-            <div className="post-list">
-              <div className="post-item"><span>07.13</span><strong>把网站留一点呼吸感</strong><em>↗</em></div>
-              <div className="post-item"><span>06.28</span><strong>重新理解“完成”这件事</strong><em>↗</em></div>
-              <div className="post-item"><span>06.10</span><strong>三种保持好奇的练习</strong><em>↗</em></div>
-            </div>
-          </article>
-
-          <div className="dashboard-split">
-            <article className="glass-card chatter-card dashboard-card">
-              <p className="card-kicker">05 / Chatter</p>
-              <div className="chatter-bubble">最近在想：如果生活也有 changelog，会写些什么？</div>
-              <span className="card-footer">A thought from today · 2h ago</span>
-            </article>
-            <article className="glass-card diary-card dashboard-card">
-              <p className="card-kicker">06 / Tiny diary</p>
-              <div className="diary-icon">✳</div>
-              <h2>Went outside.</h2>
-              <span className="card-footer">Small win · 2026.07.13</span>
-            </article>
-          </div>
-        </div>
-
         <article className="glass-card stats-card dashboard-card">
           <div className="card-heading"><div><p className="card-kicker">07 / Site dashboard</p><h2>A few numbers, just for fun.</h2></div><span className="dashboard-badge">LIVE-ISH</span></div>
           <div className="stat-list">
@@ -425,6 +400,32 @@ function HomePage({ onPageChange, now }: { onPageChange: (page: PageKey) => void
             <div><strong>∞</strong><span>Ideas left</span></div>
           </div>
         </article>
+
+        <div className="feed-column">
+          <article className="glass-card posts-card dashboard-card">
+            <div className="card-heading"><div><p className="card-kicker">04 / Notes</p><h2>最新文章</h2></div><button className="more-button" type="button">更多</button></div>
+            <div className="post-list">
+              <div className="post-item"><span>07.13</span><strong>把网站留一点呼吸感</strong><em>↗</em></div>
+              <div className="post-item"><span>06.28</span><strong>重新理解“完成”这件事</strong><em>↗</em></div>
+              <div className="post-item"><span>06.10</span><strong>三种保持好奇的练习</strong><em>↗</em></div>
+            </div>
+          </article>
+
+          <div className="dashboard-split">
+            <article className="glass-card chatter-card dashboard-card">
+              <div className="small-card-heading"><p className="card-kicker">05 / 最新杂谈</p><button className="more-button" type="button">更多</button></div>
+              <div className="chatter-bubble">最近在想：如果生活也有 changelog，会写些什么？</div>
+              <span className="card-footer">A thought from today · 2h ago</span>
+            </article>
+            <article className="glass-card diary-card dashboard-card">
+              <div className="small-card-heading"><p className="card-kicker">06 / 最新说说</p><button className="more-button" type="button">更多</button></div>
+              <div className="diary-icon">✳</div>
+              <h2>Went outside.</h2>
+              <span className="card-footer">Small win · 2026.07.13</span>
+            </article>
+          </div>
+        </div>
+
       </div>
     </>
   );
