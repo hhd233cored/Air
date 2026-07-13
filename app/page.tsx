@@ -16,39 +16,64 @@ const projects = [
   { title: "Slow Internet", type: "Editorial / 2025", description: "Notes on attention, digital gardens, and making room for thought.", color: "peach" },
 ];
 
-const calendarDetails: Record<string, { lunar: string; event?: string }> = {
-  "2026-7-1": { lunar: "五月十七", event: "建党节" },
-  "2026-7-2": { lunar: "五月十八" },
-  "2026-7-3": { lunar: "五月十九" },
-  "2026-7-4": { lunar: "五月二十" },
-  "2026-7-5": { lunar: "五月廿一" },
-  "2026-7-6": { lunar: "五月廿二" },
-  "2026-7-7": { lunar: "五月廿三", event: "小暑" },
-  "2026-7-8": { lunar: "五月廿四" },
-  "2026-7-9": { lunar: "五月廿五" },
-  "2026-7-10": { lunar: "五月廿六" },
-  "2026-7-11": { lunar: "五月廿七" },
-  "2026-7-12": { lunar: "五月廿八" },
-  "2026-7-13": { lunar: "五月廿九" },
-  "2026-7-14": { lunar: "六月初一" },
-  "2026-7-15": { lunar: "六月初二" },
-  "2026-7-16": { lunar: "六月初三" },
-  "2026-7-17": { lunar: "六月初四" },
-  "2026-7-18": { lunar: "六月初五" },
-  "2026-7-19": { lunar: "六月初六" },
-  "2026-7-20": { lunar: "六月初七" },
-  "2026-7-21": { lunar: "六月初八" },
-  "2026-7-22": { lunar: "六月初九" },
-  "2026-7-23": { lunar: "六月初十", event: "大暑" },
-  "2026-7-24": { lunar: "六月十一" },
-  "2026-7-25": { lunar: "六月十二" },
-  "2026-7-26": { lunar: "六月十三" },
-  "2026-7-27": { lunar: "六月十四" },
-  "2026-7-28": { lunar: "六月十五" },
-  "2026-7-29": { lunar: "六月十六" },
-  "2026-7-30": { lunar: "六月十七" },
-  "2026-7-31": { lunar: "六月十八" },
+const lunarDayNames = ["", "初一", "初二", "初三", "初四", "初五", "初六", "初七", "初八", "初九", "初十", "十一", "十二", "十三", "十四", "十五", "十六", "十七", "十八", "十九", "二十", "廿一", "廿二", "廿三", "廿四", "廿五", "廿六", "廿七", "廿八", "廿九", "三十"];
+
+const lunarFestivals: Record<string, string> = {
+  "1-1": "春节",
+  "1-15": "元宵节",
+  "2-2": "龙抬头",
+  "5-5": "端午节",
+  "7-7": "七夕",
+  "7-15": "中元节",
+  "8-15": "中秋节",
+  "9-9": "重阳节",
+  "12-8": "腊八节",
 };
+
+const solarFestivals: Record<string, string> = {
+  "1-1": "元旦",
+  "2-14": "情人节",
+  "3-8": "妇女节",
+  "5-1": "劳动节",
+  "6-1": "儿童节",
+  "7-1": "建党节",
+  "8-1": "建军节",
+  "9-10": "教师节",
+  "10-1": "国庆节",
+  "12-25": "圣诞节",
+};
+
+const datedCalendarEvents: Record<string, string> = {
+  "2026-7-7": "小暑",
+  "2026-7-23": "大暑",
+};
+
+const chineseCalendar = new Intl.DateTimeFormat("zh-CN-u-ca-chinese", { month: "long", day: "numeric" });
+const lunarMonthNumbers: Record<string, number> = { 一: 1, 二: 2, 三: 3, 四: 4, 五: 5, 六: 6, 七: 7, 八: 8, 九: 9, 十: 10, 十一: 11, 十二: 12 };
+
+function getLunarParts(date: Date) {
+  const parts = chineseCalendar.formatToParts(date);
+  const month = parts.find((part) => part.type === "month")?.value ?? "";
+  const day = Number(parts.find((part) => part.type === "day")?.value ?? 0);
+  return { month, day };
+}
+
+function getCalendarDetail(date: Date) {
+  const lunarParts = getLunarParts(date);
+  const lunarMonthNumber = lunarMonthNumbers[lunarParts.month.replace("闰", "")] ?? 0;
+  const lunar = `${lunarParts.month}${lunarDayNames[lunarParts.day] ?? `${lunarParts.day}日`}`;
+  const solarKey = `${date.getMonth() + 1}-${date.getDate()}`;
+  const datedKey = `${date.getFullYear()}-${date.getMonth() + 1}-${date.getDate()}`;
+  const nextDate = new Date(date.getFullYear(), date.getMonth(), date.getDate() + 1);
+  const nextLunar = getLunarParts(nextDate);
+  const nextLunarMonthNumber = Number(nextLunar.month.replace(/[^0-9一二三四五六七八九十]/g, "")) || 0;
+  const event = datedCalendarEvents[datedKey]
+    ?? solarFestivals[solarKey]
+    ?? lunarFestivals[`${lunarMonthNumber}-${lunarParts.day}`]
+    ?? (lunarMonthNumber === 12 && nextLunarMonthNumber === 1 && nextLunar.day === 1 ? "除夕" : undefined);
+
+  return { lunar, event };
+}
 
 function PageButton({ active, index, label, onClick }: { active: boolean; index: string; label: string; onClick: () => void }) {
   return (
@@ -109,7 +134,7 @@ function CalendarCard({ now }: { now: Date | null }) {
   const month = new Intl.DateTimeFormat("zh-CN", { year: "numeric", month: "long" }).format(reference);
   const firstDay = new Date(year, monthIndex, 1).getDay();
   const daysInMonth = new Date(year, monthIndex + 1, 0).getDate();
-  const cellCount = Math.ceil((firstDay + daysInMonth) / 7) * 7;
+  const cellCount = 42;
   const calendarDays = Array.from({ length: cellCount }, (_, index) => {
     const day = index - firstDay + 1;
     return day > 0 && day <= daysInMonth ? day : null;
@@ -133,7 +158,7 @@ function CalendarCard({ now }: { now: Date | null }) {
       <div className="calendar-grid">
         {weekdays.map((weekday) => <span className="calendar-weekday" key={weekday}>{weekday}</span>)}
         {calendarDays.map((day, index) => {
-          const detail = day ? calendarDetails[`${year}-${monthIndex + 1}-${day}`] : undefined;
+          const detail = day ? getCalendarDetail(new Date(year, monthIndex, day)) : undefined;
           return (
             <span className={`calendar-day ${isViewingToday && day === today.getDate() ? "is-today" : ""} ${detail?.event ? "has-event" : ""}`} key={`${day ?? "empty"}-${index}`} title={detail?.event}>
               {day ? <><b>{day}</b><small>{detail?.event ?? detail?.lunar ?? ""}</small></> : null}
