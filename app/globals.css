@@ -158,22 +158,22 @@ button:focus-visible { outline: 2px solid var(--mint); outline-offset: 3px; }
 .music-playlist-popover a { color: #e14363; font-size: 10px; text-decoration: none; }
 audio { display: none; }
 @keyframes music-disc-spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
-.feed-column { grid-column: span 4; display: flex; flex-direction: column; gap: 16px; }
+.feed-column { grid-column: span 8; display: flex; flex-direction: column; gap: 16px; }
 .posts-card { flex: 1; min-height: 190px; }
 .post-list { display: grid; gap: 8px; margin-top: 19px; }
 .post-item { display: grid; grid-template-columns: 55px minmax(0, 1fr) 20px; align-items: center; gap: 14px; min-height: 37px; padding: 0 10px; border-bottom: 1px solid rgb(104 90 135 / .12); color: var(--faint); font-size: 9px; }
 .post-item:last-child { border-bottom: 0; }
 .post-item strong { color: #594d67; font-size: 11px; font-weight: 550; }
 .post-item em { color: var(--mint); font-size: 14px; font-style: normal; text-align: right; }
-.dashboard-split { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; min-height: 204px; }
+.dashboard-split { display: grid; grid-template-columns: 1.25fr .75fr; gap: 16px; min-height: 204px; }
 .chatter-card, .diary-card { display: flex; flex-direction: column; }
 .chatter-bubble { position: relative; margin: auto 0 13px; padding: 12px; border: 1px solid rgb(104 90 135 / .14); border-radius: 11px 11px 11px 3px; background: rgb(255 255 255 / .42); color: #5f566d; font-size: 11px; line-height: 1.6; }
 .diary-card { background: linear-gradient(145deg, rgb(255 236 226 / .78), rgb(255 255 255 / .52)); }
 .diary-icon { display: grid; width: 52px; height: 52px; margin: auto 0 11px; place-items: center; border: 1px solid rgb(201 130 103 / .23); border-radius: 17px; background: rgb(255 244 218 / .55); color: var(--peach); font-size: 25px; }
 .diary-card h2 { margin: 0; color: var(--text); font-size: 19px; font-weight: 500; letter-spacing: -.06em; }
-.stats-card { grid-column: span 8; display: flex; min-height: 410px; flex-direction: column; background: linear-gradient(90deg, rgb(255 255 255 / .58), rgb(229 220 255 / .52)); }
+.stats-card { grid-column: span 4; display: flex; min-height: 410px; flex-direction: column; background: linear-gradient(90deg, rgb(255 255 255 / .58), rgb(229 220 255 / .52)); }
 .dashboard-badge { padding: 5px 8px; border: 1px solid rgb(79 157 150 / .3); border-radius: 999px; background: rgb(255 255 255 / .35); color: var(--mint); font-family: var(--font-geist-mono), Consolas, monospace; font-size: 8px; }
-.stat-list { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-top: auto; }
+.stat-list { display: grid; grid-template-columns: repeat(2, 1fr); gap: 18px 12px; margin-top: auto; }
 .stat-list div { display: flex; align-items: baseline; gap: 9px; padding-right: 16px; border-right: 1px solid rgb(104 90 135 / .13); }
 .stat-list div:last-child { border-right: 0; }
 .stat-list strong { color: var(--text); font-size: 30px; font-weight: 450; letter-spacing: -.08em; }
@@ -248,8 +248,8 @@ audio { display: none; }
   .header-status { display: none; }
   .dashboard-card--profile { grid-column: span 7; }
   .calendar-card { grid-column: span 5; }
-  .feed-column { grid-column: span 5; }
-  .stats-card { grid-column: span 7; }
+  .feed-column { grid-column: span 7; }
+  .stats-card { grid-column: span 5; }
 }
 
 @media (max-width: 700px) {
