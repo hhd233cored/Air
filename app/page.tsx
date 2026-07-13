@@ -101,7 +101,9 @@ function GlassHeader({ eyebrow, title, copy }: { eyebrow: string; title: string;
 }
 
 function CalendarCard({ now }: { now: Date | null }) {
-  const reference = now ?? new Date(2026, 6, 13);
+  const today = now ?? new Date(2026, 6, 13);
+  const [viewDate, setViewDate] = useState<Date | null>(null);
+  const reference = viewDate ?? today;
   const year = reference.getFullYear();
   const monthIndex = reference.getMonth();
   const month = new Intl.DateTimeFormat("zh-CN", { year: "numeric", month: "long" }).format(reference);
@@ -113,27 +115,31 @@ function CalendarCard({ now }: { now: Date | null }) {
     return day > 0 && day <= daysInMonth ? day : null;
   });
   const weekdays = ["日", "一", "二", "三", "四", "五", "六"];
-  const events = calendarDays
-    .filter((day): day is number => day !== null)
-    .map((day) => ({ day, event: calendarDetails[`${year}-${monthIndex + 1}-${day}`]?.event }))
-    .filter((item): item is { day: number; event: string } => Boolean(item.event));
+  const isViewingToday = year === today.getFullYear() && monthIndex === today.getMonth();
+  const changeMonth = (offset: number) => {
+    setViewDate(new Date(year, monthIndex + offset, 1));
+  };
 
   return (
     <article className="glass-card calendar-card dashboard-card">
-      <div className="calendar-card__month"><span>{month}</span><small>Monthly view</small></div>
+      <div className="calendar-card__month">
+        <span>{month}</span>
+        <div className="calendar-card__controls">
+          <button className="calendar-nav-button" type="button" onClick={() => changeMonth(-1)} aria-label="查看上个月" title="上个月">‹</button>
+          <small>Monthly view</small>
+          <button className="calendar-nav-button" type="button" onClick={() => changeMonth(1)} aria-label="查看下个月" title="下个月">›</button>
+        </div>
+      </div>
       <div className="calendar-grid">
         {weekdays.map((weekday) => <span className="calendar-weekday" key={weekday}>{weekday}</span>)}
         {calendarDays.map((day, index) => {
           const detail = day ? calendarDetails[`${year}-${monthIndex + 1}-${day}`] : undefined;
           return (
-            <span className={`calendar-day ${day === reference.getDate() ? "is-today" : ""} ${detail?.event ? "has-event" : ""}`} key={`${day ?? "empty"}-${index}`} title={detail?.event}>
-              {day ? <><b>{day}</b><small>{detail?.lunar ?? ""}</small></> : null}
+            <span className={`calendar-day ${isViewingToday && day === today.getDate() ? "is-today" : ""} ${detail?.event ? "has-event" : ""}`} key={`${day ?? "empty"}-${index}`} title={detail?.event}>
+              {day ? <><b>{day}</b><small>{detail?.event ?? detail?.lunar ?? ""}</small></> : null}
             </span>
           );
         })}
-      </div>
-      <div className="calendar-highlights">
-        {events.map(({ day, event }) => <span key={event}><b>{day}日</b> {event}</span>)}
       </div>
       <div className="calendar-card__footer"><span>Today&apos;s page</span><span>{reference.getFullYear()}</span></div>
     </article>
