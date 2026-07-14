@@ -10,6 +10,7 @@ import com.yourspace.common.PageResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -47,27 +48,32 @@ public class ArticleController {
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
+    @PreAuthorize("hasRole('ADMIN')")
     public ArticleResponse create(@Valid @RequestBody CreateArticleRequest request) {
         return service.create(request);
     }
 
     @PutMapping("/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
     public ArticleResponse update(@PathVariable UUID id, @Valid @RequestBody UpdateArticleRequest request) {
         return service.update(id, request);
     }
 
     @PostMapping("/{id}/publish")
+    @PreAuthorize("hasRole('ADMIN')")
     public ArticleResponse publish(@PathVariable UUID id) {
         return service.publish(id);
     }
 
     @PostMapping("/{id}/archive")
+    @PreAuthorize("hasRole('ADMIN')")
     public ArticleResponse archive(@PathVariable UUID id) {
         return service.archive(id);
     }
 
     @DeleteMapping("/{id}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
+    @PreAuthorize("hasRole('ADMIN')")
     public void delete(@PathVariable UUID id) {
         service.delete(id);
     }

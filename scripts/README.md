@@ -68,3 +68,5 @@ powershell -ExecutionPolicy Bypass -File scripts/import-articles.ps1 -UpdateExis
 ```powershell
 powershell -ExecutionPolicy Bypass -File scripts/import-articles.ps1 -UpdateExisting -Publish -TimeoutSec 30
 ```
+
+导入脚本现在需要管理员登录。可以在根目录 `.env` 中设置 `AUTH_ADMIN_USERNAME` 和 `AUTH_ADMIN_PASSWORD`，也可以直接传入 `-Username` 与 `-Password`。脚本会自动获取 CSRF Token、保存 Session Cookie 后再执行写入操作。详细说明请查看 [`backend/AUTH.md`](../backend/AUTH.md)。

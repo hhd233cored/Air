@@ -2,6 +2,8 @@ param(
     [string]$BaseUrl = "http://localhost:8080",
     [string]$InputDirectory = ".\article-export",
     [string]$PublicDirectory = ".\public",
+    [string]$Username = $env:AUTH_ADMIN_USERNAME,
+    [string]$Password = $env:AUTH_ADMIN_PASSWORD,
     [int]$TimeoutSec = 15,
     [switch]$Publish,
     [switch]$UpdateExisting
@@ -22,6 +24,18 @@ if ($manifest.format -ne "your-space-articles-v1") {
     throw "Unsupported article export format: $($manifest.format)"
 }
 
+if ([string]::IsNullOrWhiteSpace($Username) -or [string]::IsNullOrWhiteSpace($Password)) {
+    throw "Admin credentials are required. Pass -Username/-Password or set AUTH_ADMIN_USERNAME/AUTH_ADMIN_PASSWORD."
+}
+
+$webSession = New-Object Microsoft.PowerShell.Commands.WebRequestSession
+$csrf = Invoke-RestMethod -Uri "$apiRoot/auth/csrf" -Method Get -TimeoutSec $TimeoutSec -WebSession $webSession
+if ([string]::IsNullOrWhiteSpace([string]$csrf.token)) {
+    throw "The API did not return a CSRF token."
+}
+$loginBody = @{ username = $Username; password = $Password } | ConvertTo-Json
+Invoke-RestMethod -Uri "$apiRoot/auth/login" -Method Post -TimeoutSec $TimeoutSec -WebSession $webSession -Headers @{ "X-XSRF-TOKEN" = [string]$csrf.token } -ContentType "application/json; charset=utf-8" -Body $loginBody | Out-Null
+
 function Invoke-ArticleApi {
     param(
         [string]$Uri,
@@ -34,9 +48,13 @@ function Invoke-ArticleApi {
         Uri = $Uri
         Method = $Method
         TimeoutSec = $TimeoutSec
+        WebSession = $webSession
     }
     if (-not [string]::IsNullOrWhiteSpace($Body)) { $requestArgs.Body = $Body }
     if (-not [string]::IsNullOrWhiteSpace($ContentType)) { $requestArgs.ContentType = $ContentType }
+    if ($Method.ToUpperInvariant() -notin @("GET", "HEAD", "OPTIONS")) {
+        $requestArgs.Headers = @{ "X-XSRF-TOKEN" = [string]$csrf.token }
+    }
     Invoke-RestMethod @requestArgs
 }
 

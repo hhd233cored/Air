@@ -62,4 +62,4 @@ npm.cmd run articles:export  # 导出文章、Markdown 和封面
 npm.cmd run articles:import  # 导入文章和封面
 ```
 
-当前后端尚未接入鉴权，写入接口仅用于本地开发。部署到公网前需要增加认证和权限控制。
+当前后端已接入 Spring Security 鉴权。已发布文章可以公开读取，文章写入接口仅允许管理员账号调用。账号初始化和登录接口说明请查看 [`backend/AUTH.md`](backend/AUTH.md)。

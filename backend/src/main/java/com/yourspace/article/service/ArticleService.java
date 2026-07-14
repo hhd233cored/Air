@@ -46,6 +46,20 @@ public class ArticleService {
                 .orElseThrow(() -> new ArticleNotFoundException(slug));
     }
 
+    @Transactional(readOnly = true)
+    public PageResponse<ArticleSummaryResponse> listAdmin(int page, int size, ArticleStatus status) {
+        Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"));
+        Page<Article> result = status == null
+                ? repository.findAll(pageable)
+                : repository.findAllByStatus(status, pageable);
+        return new PageResponse<>(result.map(this::toSummary).getContent(), result.getNumber(), result.getSize(), result.getTotalElements(), result.getTotalPages());
+    }
+
+    @Transactional(readOnly = true)
+    public ArticleResponse getAdmin(UUID id) {
+        return toResponse(getById(id));
+    }
+
     public ArticleResponse create(CreateArticleRequest request) {
         String slug = request.slug() == null || request.slug().isBlank() ? slugify(request.title()) : normalizeSlug(request.slug());
         ensureSlugAvailable(slug, null);

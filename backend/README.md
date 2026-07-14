@@ -55,4 +55,4 @@ mvn -version
 - `src/main/resources/db/migration-h2/`：H2 本地模式的数据库迁移
 - `src/test/`：后端单元测试和集成测试
 
-当前暂未接入鉴权，写入接口仅适合本地使用。部署到公网前需要增加 Spring Security 和管理权限。
+鉴权说明请查看 [`AUTH.md`](AUTH.md)。当前使用 Spring Security、BCrypt 和 HttpOnly Session Cookie；已发布文章公开读取，文章写入接口只允许管理员调用。

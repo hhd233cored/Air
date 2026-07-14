@@ -1,6 +1,7 @@
 "use client";
 
 import { type ReactNode, useEffect, useRef, useState } from "react";
+import { type AuthUser, getCurrentUser, login, logout } from "./lib/api/auth";
 import { type ArticleSummary, getAllPublishedArticles, getPublishedArticle, getPublishedArticles } from "./lib/api/articles";
 
 type PageKey = "home" | "projects" | "about" | "article";
@@ -226,6 +227,71 @@ function PageButton({ active, index, label, onClick }: { active: boolean; index:
       <span>{index}</span>
       {label}
     </button>
+  );
+}
+
+function AuthControls() {
+  const [user, setUser] = useState<AuthUser | null>(null);
+  const [ready, setReady] = useState(false);
+  const [open, setOpen] = useState(false);
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    getCurrentUser()
+      .then(setUser)
+      .catch(() => setUser(null))
+      .finally(() => setReady(true));
+  }, []);
+
+  const submit = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setBusy(true);
+    setError("");
+    try {
+      setUser(await login(username, password));
+      setPassword("");
+      setOpen(false);
+    } catch (requestError) {
+      setError(requestError instanceof Error ? requestError.message : "登录失败");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const signOut = async () => {
+    setBusy(true);
+    try {
+      await logout();
+    } finally {
+      setUser(null);
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="header-status">
+      <span className="header-status__presence"><span className="status-dot" /> Online-ish</span>
+      {!ready ? null : user ? (
+        <div className="auth-logged-in">
+          <span className="auth-user-label">{user.username} · {user.role === "ADMIN" ? "管理员" : "普通用户"}</span>
+          <button className="auth-action-button" type="button" onClick={signOut} disabled={busy}>退出</button>
+        </div>
+      ) : (
+        <button className="auth-action-button" type="button" onClick={() => { setOpen((visible) => !visible); setError(""); }} aria-expanded={open}>登录</button>
+      )}
+      {open && !user ? (
+        <form className="auth-login-panel" onSubmit={submit}>
+          <strong>登录</strong>
+          <label>账号<input autoComplete="username" value={username} onChange={(event) => setUsername(event.target.value)} required /></label>
+          <label>密码<input autoComplete="current-password" type="password" value={password} onChange={(event) => setPassword(event.target.value)} required /></label>
+          {error ? <p role="alert">{error}</p> : null}
+          <button type="submit" disabled={busy}>{busy ? "登录中…" : "确认登录"}</button>
+        </form>
+      ) : null}
+    </div>
   );
 }
 
@@ -759,7 +825,7 @@ function ArticleListPage({ onOpenArticle }: { onOpenArticle: (slug: string) => v
         {status === "fallback" ? <p className="article-list-note">Java API 暂不可用，当前显示本地示例文章。</p> : null}
         {status !== "loading" ? (
           <div className="article-timeline" aria-label="文章列表">
-            {articles.map((article, index) => {
+            {articles.map((article) => {
               const createdAt = formatArticleCreatedAt(article.createdAt);
               const isHovered = hoveredSlug === article.slug;
               return (
@@ -900,7 +966,7 @@ export default function Home() {
         <nav className="page-nav" aria-label="页面切换">
           {navigation.map((item) => <PageButton key={item.id} active={activePage === item.id} index={item.index} label={item.label} onClick={() => { setActivePage(item.id); setSelectedArticleSlug(null); }} />)}
         </nav>
-        <div className="header-status"><span className="status-dot" /> <span>Online-ish</span></div>
+        <AuthControls />
         </div>
       </header>
 

@@ -2,6 +2,7 @@ package com.yourspace.common;
 
 import com.yourspace.article.service.ArticleNotFoundException;
 import com.yourspace.article.service.DuplicateSlugException;
+import com.yourspace.auth.service.InvalidCredentialsException;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -24,6 +25,11 @@ public class ApiExceptionHandler {
     @ExceptionHandler(DuplicateSlugException.class)
     public ResponseEntity<ApiError> conflict(DuplicateSlugException exception, HttpServletRequest request) {
         return error(HttpStatus.CONFLICT, "ARTICLE_SLUG_EXISTS", exception.getMessage(), request, Map.of());
+    }
+
+    @ExceptionHandler(InvalidCredentialsException.class)
+    public ResponseEntity<ApiError> invalidCredentials(InvalidCredentialsException exception, HttpServletRequest request) {
+        return error(HttpStatus.UNAUTHORIZED, "AUTH_INVALID_CREDENTIALS", exception.getMessage(), request, Map.of());
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)

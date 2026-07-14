@@ -1,5 +1,22 @@
 $ErrorActionPreference = "Stop"
 
+# Load the repository .env into this PowerShell process so local Spring Boot
+# startup can use the same database and authentication settings as Docker.
+$environmentFile = Join-Path $PSScriptRoot "..\.env"
+if (Test-Path -LiteralPath $environmentFile) {
+    Get-Content -LiteralPath $environmentFile -Encoding UTF8 | ForEach-Object {
+        $line = $_.Trim()
+        if ($line -and -not $line.StartsWith('#') -and $line -match '^([^=]+)=(.*)$') {
+            $name = $matches[1].Trim()
+            $value = $matches[2].Trim()
+            if (($value.StartsWith('"') -and $value.EndsWith('"')) -or ($value.StartsWith("'") -and $value.EndsWith("'"))) {
+                $value = $value.Substring(1, $value.Length - 2)
+            }
+            [Environment]::SetEnvironmentVariable($name, $value, 'Process')
+        }
+    }
+}
+
 $pom = Join-Path $PSScriptRoot "pom.xml"
 $maven = Get-Command mvn -ErrorAction SilentlyContinue
 
