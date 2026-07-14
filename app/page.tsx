@@ -39,6 +39,14 @@ const fallbackArticleList: ArticleSummary[] = [
   },
 ];
 
+const articleMaskColors: Record<string, string> = {
+  "first-note": "91 78 121",
+  "quiet-corner": "139 103 119",
+  "building-a-place-for-notes": "70 111 107",
+  "the-weather-of-a-day": "151 112 84",
+  "small-things-worth-keeping": "143 103 84",
+};
+
 function formatArticleDate(value: string | null) {
   if (!value) return "--.--";
   const date = new Date(value);
@@ -736,7 +744,7 @@ function ArticleListPage({ onOpenArticle }: { onOpenArticle: (slug: string) => v
                     onMouseLeave={() => setHoveredSlug(null)}
                     onFocus={() => handleArticleHover(article.slug)}
                     onBlur={() => setHoveredSlug(null)}
-                    style={article.coverUrl ? { backgroundImage: `linear-gradient(100deg, rgb(255 255 255 / ${isHovered ? ".68" : ".82"}), rgb(255 255 255 / ${isHovered ? ".30" : ".48"})), url("${article.coverUrl}")` } : undefined}
+                    style={article.coverUrl ? { "--article-mask-rgb": articleMaskColors[article.slug] ?? "48 39 65", backgroundImage: `linear-gradient(100deg, rgb(255 255 255 / .82), rgb(255 255 255 / .48)), url("${article.coverUrl}")` } as React.CSSProperties : undefined}
                   >
                     <div className="article-list-card__topline"><span>{String(index + 1).padStart(2, "0")} / Article</span><span>{formatArticleDate(article.publishedAt)}</span></div>
                     <h2>{article.title}</h2>
