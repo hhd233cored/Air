@@ -18,12 +18,6 @@ const projects = [
   { title: "Slow Internet", type: "Editorial / 2025", description: "Notes on attention, digital gardens, and making room for thought.", color: "peach" },
 ];
 
-const fallbackLatestPosts = [
-  { date: "07.13", title: "把网站留一点呼吸感" },
-  { date: "06.28", title: "重新理解“完成”这件事" },
-  { date: "06.10", title: "三种保持好奇的练习" },
-];
-
 const fallbackArticleList: ArticleSummary[] = [
   {
     id: "fallback-first-note",
@@ -429,7 +423,35 @@ function MusicPlayerBar({ compact = false }: { compact?: boolean }) {
   );
 }
 
-function HomePage({ onPageChange, now }: { onPageChange: (page: PageKey) => void; now: Date | null }) {
+function HomeArticleCard({ article, onOpenArticle }: { article: ArticleSummary; onOpenArticle: (slug: string) => void }) {
+  const [isHovered, setIsHovered] = useState(false);
+
+  return (
+    <button
+      className={`glass-card article-list-card article-list-card--home ${article.coverUrl ? "has-cover" : ""} ${isHovered ? "is-hovered" : ""}`}
+      type="button"
+      onClick={() => onOpenArticle(article.slug)}
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
+      onFocus={() => setIsHovered(true)}
+      onBlur={() => setIsHovered(false)}
+      style={article.coverUrl ? { "--article-mask-rgb": articleMaskColors[article.slug] ?? "48 39 65", backgroundImage: `url("${article.coverUrl}")` } as React.CSSProperties : undefined}
+    >
+      <div className="article-list-card__topline"><span>Latest article</span><span>{formatArticleDate(article.publishedAt)}</span></div>
+      {article.coverUrl ? (
+        <>
+          <div className="article-list-card__mask">
+            <h2 className="article-list-card__mask-title">{article.title}</h2>
+            <div className="article-list-card__preview" aria-live="polite"><div className="article-list-card__preview-copy">{isHovered && article.summary ? <span>{article.summary}</span> : null}</div></div>
+          </div>
+          <div className="article-list-card__bottom-bar" aria-hidden="true" />
+        </>
+      ) : <h2>{article.title}</h2>}
+    </button>
+  );
+}
+
+function HomePage({ onPageChange, onOpenArticle, now }: { onPageChange: (page: PageKey) => void; onOpenArticle: (slug: string) => void; now: Date | null }) {
   const [latestArticles, setLatestArticles] = useState<ArticleSummary[]>([]);
 
   useEffect(() => {
@@ -445,9 +467,7 @@ function HomePage({ onPageChange, now }: { onPageChange: (page: PageKey) => void
     return () => { cancelled = true; };
   }, []);
 
-  const latestPosts = latestArticles.length
-    ? latestArticles.map((article) => ({ date: formatArticleDate(article.publishedAt), title: article.title, slug: article.slug }))
-    : fallbackLatestPosts.map((post) => ({ ...post, slug: post.title }));
+  const latestArticle = latestArticles[0] ?? fallbackArticleList[0];
 
   return (
     <>
@@ -474,10 +494,8 @@ function HomePage({ onPageChange, now }: { onPageChange: (page: PageKey) => void
 
         <div className="feed-column">
           <article className="glass-card posts-card dashboard-card">
-            <div className="card-heading"><div><p className="card-kicker">04 / Notes</p><h2>最新文章</h2></div><button className="more-button" type="button">更多</button></div>
-            <div className="post-list">
-              {latestPosts.map((post) => <div className="post-item" key={post.slug}><span>{post.date}</span><strong>{post.title}</strong><em>↗</em></div>)}
-            </div>
+            <div className="card-heading"><div><p className="card-kicker">04 / Notes</p><h2>最新文章</h2></div><button className="more-button" type="button" onClick={() => onPageChange("article")}>更多</button></div>
+            <HomeArticleCard article={latestArticle} onOpenArticle={onOpenArticle} />
           </article>
 
           <div className="dashboard-split">
@@ -878,7 +896,7 @@ export default function Home() {
       {activePage !== "article" ? <ClockDisplay now={now} /> : null}
 
       <div className="workspace-shell shell">
-        {activePage === "home" && <HomePage onPageChange={setActivePage} now={now} />}
+        {activePage === "home" && <HomePage onPageChange={setActivePage} onOpenArticle={(slug) => { setSelectedArticleSlug(slug); setActivePage("article"); }} now={now} />}
         {activePage === "projects" && <ProjectsPage />}
         {activePage === "about" && <AboutPage />}
         {activePage === "article" && (selectedArticleSlug
