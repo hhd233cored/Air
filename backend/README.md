@@ -12,6 +12,8 @@ docker compose up --build
 
 后端地址为 `http://localhost:8080`，健康检查为 `/api/v1/health`，Swagger UI 为 `/swagger-ui.html`。
 
+首次启动或已有数据库升级时，Flyway 会执行 `V2__seed_example_articles.sql`，写入 4 篇已发布的示例文章。重复启动不会重复插入。
+
 ## 目录约定
 
 - `src/main/java/com/yourspace/article/`：文章领域的实体、接口、服务和仓储
