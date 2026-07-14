@@ -41,13 +41,6 @@ const articleMaskColors: Record<string, string> = {
   "small-things-worth-keeping": "158 132 118",
 };
 
-function formatArticleDate(value: string | null) {
-  if (!value) return "--.--";
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "--.--";
-  return `${String(date.getMonth() + 1).padStart(2, "0")}.${String(date.getDate()).padStart(2, "0")}`;
-}
-
 function formatArticleCreatedAt(value: string | null) {
   if (!value) return { date: "----.--.--", time: "--:--" };
   const date = new Date(value);
@@ -457,7 +450,6 @@ function HomeArticleCard({ article, onOpenArticle }: { article: ArticleSummary; 
       onBlur={() => setIsHovered(false)}
       style={article.coverUrl ? { "--article-mask-rgb": articleMaskColors[article.slug] ?? "48 39 65", backgroundImage: `url("${article.coverUrl}")` } as React.CSSProperties : undefined}
     >
-      <div className="article-list-card__topline"><span>Latest article</span></div>
       {article.coverUrl ? (
         <>
           <div className="article-list-card__mask">
@@ -514,7 +506,7 @@ function HomePage({ onPageChange, onOpenArticle, now }: { onPageChange: (page: P
 
         <div className="feed-column">
           <article className="glass-card posts-card dashboard-card">
-            <div className="card-heading"><div><p className="card-kicker">04 / Notes</p><h2>最新文章</h2></div><button className="more-button" type="button" onClick={() => onPageChange("article")}>更多</button></div>
+            <div className="card-heading"><div><p className="card-kicker">Latest Article</p><h2>最新文章</h2></div><button className="more-button" type="button" onClick={() => onPageChange("article")}>更多</button></div>
             <HomeArticleCard article={latestArticle} onOpenArticle={onOpenArticle} />
           </article>
 
@@ -784,7 +776,6 @@ function ArticleListPage({ onOpenArticle }: { onOpenArticle: (slug: string) => v
                     onBlur={() => setHoveredSlug(null)}
                     style={article.coverUrl ? { "--article-mask-rgb": articleMaskColors[article.slug] ?? "48 39 65", backgroundImage: `url("${article.coverUrl}")` } as React.CSSProperties : undefined}
                   >
-                    <div className="article-list-card__topline"><span>{String(index + 1).padStart(2, "0")} / Article</span></div>
                     {article.coverUrl ? (
                       <>
                         <div className="article-list-card__mask">
@@ -874,7 +865,7 @@ function ArticleDetailPage({ slug, onBack }: { slug: string; onBack: () => void 
         >
         </div>
         <article className="glass-card article-card">
-          <div className="article-card__meta"><span>04 / Article</span><span>{articleTitle}</span></div>
+          <div className="article-card__meta"><span>{articleTitle}</span></div>
           {status === "loading" ? <p className="article-state">正在读取 Markdown…</p> : null}
           {status === "error" ? <p className="article-state">暂时无法读取文章内容，请检查 Java API 或 Markdown 文件。</p> : null}
           {status === "ready" ? <MarkdownContent source={source} /> : null}
