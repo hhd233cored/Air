@@ -820,10 +820,8 @@ function ArticleDetailPage({ slug, onBack }: { slug: string; onBack: () => void 
         <div
           className={`article-cover-space ${coverUrl ? "has-image" : ""}`}
           aria-label="文章头图"
-          style={coverUrl ? { backgroundImage: `linear-gradient(100deg, rgb(255 255 255 / .38), rgb(255 255 255 / .08)), url("${coverUrl}")` } : undefined}
+          style={coverUrl ? { backgroundImage: `url("${coverUrl}")` } : undefined}
         >
-          <div className="article-cover-space__label">Article / Cover image</div>
-          <div className="article-cover-space__hint">Reserved space for a wide image</div>
         </div>
         <article className="glass-card article-card">
           <div className="article-card__meta"><span>04 / Article</span><span>{articleTitle}</span></div>

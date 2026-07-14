@@ -247,9 +247,6 @@ audio { display: none; }
 .article-cover-space::before, .article-cover-space::after { position: absolute; border: 1px solid rgb(139 115 201 / .17); border-radius: 50%; content: ""; pointer-events: none; }
 .article-cover-space::before { top: -35%; right: 8%; width: 260px; height: 260px; background: rgb(255 255 255 / .16); }
 .article-cover-space::after { right: 20%; bottom: -45%; width: 220px; height: 220px; background: rgb(220 247 242 / .2); }
-.article-cover-space__label, .article-cover-space__hint { position: relative; z-index: 1; font-family: var(--font-geist-mono), Consolas, monospace; font-size: 9px; letter-spacing: .08em; text-transform: uppercase; }
-.article-cover-space__label { color: var(--accent); }
-.article-cover-space__hint { color: #9d94a6; }
 .article-card { min-height: 540px; margin-top: -1px; padding: clamp(28px, 5vw, 58px); border-radius: 0 0 16px 16px; background: rgb(255 255 255 / .72); }
 .article-card__meta { display: flex; align-items: center; justify-content: space-between; gap: 16px; color: var(--faint); font-family: var(--font-geist-mono), Consolas, monospace; font-size: 9px; letter-spacing: .07em; text-transform: uppercase; }
 .article-card__meta span:last-child { color: #aaa1b2; }
