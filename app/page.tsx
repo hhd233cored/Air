@@ -750,13 +750,13 @@ function ArticleListPage({ onOpenArticle }: { onOpenArticle: (slug: string) => v
                     {article.coverUrl ? (
                       <div className="article-list-card__title-bar">
                         <span>{article.title}</span>
-                        <div className="article-list-card__preview" aria-live="polite">{isHovered ? (previewLoadingSlug === article.slug ? <span>正在读取正文…</span> : previews[article.slug]?.map((line, lineIndex) => <span key={`${article.slug}-preview-${lineIndex}`}>{line}</span>)) : null}</div>
+                        <div className="article-list-card__preview" aria-live="polite"><div className="article-list-card__preview-copy">{isHovered ? (previewLoadingSlug === article.slug ? <span>正在读取正文…</span> : previews[article.slug]?.map((line, lineIndex) => <span key={`${article.slug}-preview-${lineIndex}`}>{line}</span>)) : null}</div></div>
                       </div>
                     ) : (
                       <>
                         <h2>{article.title}</h2>
                         {article.summary ? <p>{article.summary}</p> : null}
-                        <div className="article-list-card__preview" aria-live="polite">{isHovered ? (previewLoadingSlug === article.slug ? <span>正在读取正文…</span> : previews[article.slug]?.map((line, lineIndex) => <span key={`${article.slug}-preview-${lineIndex}`}>{line}</span>)) : null}</div>
+                        <div className="article-list-card__preview" aria-live="polite"><div className="article-list-card__preview-copy">{isHovered ? (previewLoadingSlug === article.slug ? <span>正在读取正文…</span> : previews[article.slug]?.map((line, lineIndex) => <span key={`${article.slug}-preview-${lineIndex}`}>{line}</span>)) : null}</div></div>
                       </>
                     )}
                     <div className="article-list-card__bottom">
