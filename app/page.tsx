@@ -747,9 +747,18 @@ function ArticleListPage({ onOpenArticle }: { onOpenArticle: (slug: string) => v
                     style={article.coverUrl ? { "--article-mask-rgb": articleMaskColors[article.slug] ?? "48 39 65", backgroundImage: `url("${article.coverUrl}")` } as React.CSSProperties : undefined}
                   >
                     <div className="article-list-card__topline"><span>{String(index + 1).padStart(2, "0")} / Article</span><span>{formatArticleDate(article.publishedAt)}</span></div>
-                    {article.coverUrl ? <div className="article-list-card__title-bar"><span>{article.title}</span></div> : <h2>{article.title}</h2>}
-                    {article.summary ? <p>{article.summary}</p> : null}
-                    <div className="article-list-card__preview" aria-live="polite">{isHovered ? (previewLoadingSlug === article.slug ? <span>正在读取正文…</span> : previews[article.slug]?.map((line, lineIndex) => <span key={`${article.slug}-preview-${lineIndex}`}>{line}</span>)) : null}</div>
+                    {article.coverUrl ? (
+                      <div className="article-list-card__title-bar">
+                        <span>{article.title}</span>
+                        <div className="article-list-card__preview" aria-live="polite">{isHovered ? (previewLoadingSlug === article.slug ? <span>正在读取正文…</span> : previews[article.slug]?.map((line, lineIndex) => <span key={`${article.slug}-preview-${lineIndex}`}>{line}</span>)) : null}</div>
+                      </div>
+                    ) : (
+                      <>
+                        <h2>{article.title}</h2>
+                        {article.summary ? <p>{article.summary}</p> : null}
+                        <div className="article-list-card__preview" aria-live="polite">{isHovered ? (previewLoadingSlug === article.slug ? <span>正在读取正文…</span> : previews[article.slug]?.map((line, lineIndex) => <span key={`${article.slug}-preview-${lineIndex}`}>{line}</span>)) : null}</div>
+                      </>
+                    )}
                     <div className="article-list-card__bottom">
                       <div className="article-list-card__tags">{article.tags.map((tag) => <span key={tag}>{tag}</span>)}</div>
                       <span className="article-list-card__arrow">↗</span>
