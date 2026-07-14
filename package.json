@@ -15,7 +15,9 @@
     "backend:up": "docker compose up --build",
     "backend:down": "docker compose down",
     "backend:local": "powershell -ExecutionPolicy Bypass -File backend/run-local.ps1",
-    "backend:test": "mvn -f backend/pom.xml test"
+    "backend:test": "mvn -f backend/pom.xml test",
+    "articles:export": "powershell -ExecutionPolicy Bypass -File scripts/export-articles.ps1",
+    "articles:import": "powershell -ExecutionPolicy Bypass -File scripts/import-articles.ps1"
   },
   "dependencies": {
     "drizzle-orm": "0.45.2",
