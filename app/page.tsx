@@ -425,24 +425,44 @@ function MusicPlayerBar({ compact = false }: { compact?: boolean }) {
 
 function HomeArticleCard({ article, onOpenArticle }: { article: ArticleSummary; onOpenArticle: (slug: string) => void }) {
   const [isHovered, setIsHovered] = useState(false);
+  const [previewLines, setPreviewLines] = useState<string[]>([]);
+  const [previewLoading, setPreviewLoading] = useState(false);
+
+  const loadPreview = async () => {
+    if (previewLines.length || previewLoading) return;
+    setPreviewLoading(true);
+    try {
+      const detail = await getPublishedArticle(article.slug);
+      setPreviewLines(getArticlePreviewLines(detail.contentMarkdown));
+    } catch {
+      setPreviewLines(article.summary ? [article.summary] : []);
+    } finally {
+      setPreviewLoading(false);
+    }
+  };
+
+  const handleHover = () => {
+    setIsHovered(true);
+    void loadPreview();
+  };
 
   return (
     <button
       className={`glass-card article-list-card article-list-card--home ${article.coverUrl ? "has-cover" : ""} ${isHovered ? "is-hovered" : ""}`}
       type="button"
       onClick={() => onOpenArticle(article.slug)}
-      onMouseEnter={() => setIsHovered(true)}
+      onMouseEnter={handleHover}
       onMouseLeave={() => setIsHovered(false)}
-      onFocus={() => setIsHovered(true)}
+      onFocus={handleHover}
       onBlur={() => setIsHovered(false)}
       style={article.coverUrl ? { "--article-mask-rgb": articleMaskColors[article.slug] ?? "48 39 65", backgroundImage: `url("${article.coverUrl}")` } as React.CSSProperties : undefined}
     >
-      <div className="article-list-card__topline"><span>Latest article</span><span>{formatArticleDate(article.publishedAt)}</span></div>
+      <div className="article-list-card__topline"><span>Latest article</span></div>
       {article.coverUrl ? (
         <>
           <div className="article-list-card__mask">
             <h2 className="article-list-card__mask-title">{article.title}</h2>
-            <div className="article-list-card__preview" aria-live="polite"><div className="article-list-card__preview-copy">{isHovered && article.summary ? <span>{article.summary}</span> : null}</div></div>
+            <div className="article-list-card__preview" aria-live="polite"><div className="article-list-card__preview-copy">{isHovered ? (previewLoading ? <span>正在读取正文…</span> : previewLines.map((line, lineIndex) => <span key={`${article.slug}-home-preview-${lineIndex}`}>{line}</span>)) : null}</div></div>
           </div>
           <div className="article-list-card__bottom-bar" aria-hidden="true" />
         </>
@@ -764,7 +784,7 @@ function ArticleListPage({ onOpenArticle }: { onOpenArticle: (slug: string) => v
                     onBlur={() => setHoveredSlug(null)}
                     style={article.coverUrl ? { "--article-mask-rgb": articleMaskColors[article.slug] ?? "48 39 65", backgroundImage: `url("${article.coverUrl}")` } as React.CSSProperties : undefined}
                   >
-                    <div className="article-list-card__topline"><span>{String(index + 1).padStart(2, "0")} / Article</span><span>{formatArticleDate(article.publishedAt)}</span></div>
+                    <div className="article-list-card__topline"><span>{String(index + 1).padStart(2, "0")} / Article</span></div>
                     {article.coverUrl ? (
                       <>
                         <div className="article-list-card__mask">
