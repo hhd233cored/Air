@@ -9,6 +9,7 @@ export type ArticleSummary = {
   tags: string[];
   status: "DRAFT" | "PUBLISHED" | "ARCHIVED";
   publishedAt: string | null;
+  createdAt: string | null;
   updatedAt: string | null;
 };
 

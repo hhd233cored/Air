@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 620" preserveAspectRatio="xMidYMid slice">
+  <defs>
+    <linearGradient id="building-notes-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#e9f6f1"/><stop offset=".48" stop-color="#d4e8ec"/><stop offset="1" stop-color="#e9daf4"/></linearGradient>
+  </defs>
+  <rect width="1600" height="620" fill="url(#building-notes-bg)"/>
+  <g fill="none" stroke="#fff" stroke-opacity=".62" stroke-width="3">
+    <path d="M180 510 L180 190 L430 110 L430 510"/><path d="M520 510 L520 150 L770 220 L770 510"/><path d="M860 510 L860 250 L1110 130 L1110 510"/>
+    <path d="M180 280 L430 200 M520 290 L770 350 M860 360 L1110 250"/>
+  </g>
+  <circle cx="1330" cy="180" r="128" fill="#fff" opacity=".36"/>
+  <text x="92" y="120" fill="#496b6c" font-family="Georgia,serif" font-size="34" letter-spacing="8">A PLACE FOR NOTES</text>
+</svg>

@@ -30,10 +30,11 @@ const fallbackArticleList: ArticleSummary[] = [
     slug: "first-note",
     title: "First note",
     summary: "The first sample article served by the Java API.",
-    coverUrl: null,
+    coverUrl: "/article-covers/first-note.svg",
     tags: ["notes"],
     status: "PUBLISHED",
     publishedAt: "2026-07-14T12:00:00Z",
+    createdAt: "2026-07-14T12:00:00Z",
     updatedAt: "2026-07-14T12:00:00Z",
   },
 ];
@@ -43,6 +44,16 @@ function formatArticleDate(value: string | null) {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return "--.--";
   return `${String(date.getMonth() + 1).padStart(2, "0")}.${String(date.getDate()).padStart(2, "0")}`;
+}
+
+function formatArticleCreatedAt(value: string | null) {
+  if (!value) return { date: "----.--.--", time: "--:--" };
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return { date: "----.--.--", time: "--:--" };
+  return {
+    date: `${date.getFullYear()}.${String(date.getMonth() + 1).padStart(2, "0")}.${String(date.getDate()).padStart(2, "0")}`,
+    time: new Intl.DateTimeFormat("zh-CN", { hour: "2-digit", minute: "2-digit", hour12: false }).format(date),
+  };
 }
 
 type MusicTrack = { title: string; artist: string; cover: string; src: string };
@@ -668,18 +679,30 @@ function ArticleListPage({ onOpenArticle }: { onOpenArticle: (slug: string) => v
         {status === "loading" ? <p className="article-state">正在读取文章列表…</p> : null}
         {status === "fallback" ? <p className="article-list-note">Java API 暂不可用，当前显示本地示例文章。</p> : null}
         {status !== "loading" ? (
-          <div className="article-list" aria-label="文章列表">
-            {articles.map((article, index) => (
-              <button className="glass-card article-list-card" key={article.id} type="button" onClick={() => onOpenArticle(article.slug)}>
-                <div className="article-list-card__topline"><span>{String(index + 1).padStart(2, "0")} / Article</span><span>{formatArticleDate(article.publishedAt)}</span></div>
-                <h2>{article.title}</h2>
-                {article.summary ? <p>{article.summary}</p> : null}
-                <div className="article-list-card__bottom">
-                  <div className="article-list-card__tags">{article.tags.map((tag) => <span key={tag}>{tag}</span>)}</div>
-                  <span className="article-list-card__arrow">↗</span>
+          <div className="article-timeline" aria-label="文章列表">
+            {articles.map((article, index) => {
+              const createdAt = formatArticleCreatedAt(article.createdAt);
+              return (
+                <div className="article-timeline-item" key={article.id}>
+                  <time className="article-timeline-date" dateTime={article.createdAt ?? undefined}><strong>{createdAt.date}</strong><span>{createdAt.time}</span></time>
+                  <span className="article-timeline-dot" aria-hidden="true" />
+                  <button
+                    className={`glass-card article-list-card ${article.coverUrl ? "has-cover" : ""}`}
+                    type="button"
+                    onClick={() => onOpenArticle(article.slug)}
+                    style={article.coverUrl ? { backgroundImage: `linear-gradient(100deg, rgb(255 255 255 / .96), rgb(255 255 255 / .66)), url("${article.coverUrl}")` } : undefined}
+                  >
+                    <div className="article-list-card__topline"><span>{String(index + 1).padStart(2, "0")} / Article</span><span>{formatArticleDate(article.publishedAt)}</span></div>
+                    <h2>{article.title}</h2>
+                    {article.summary ? <p>{article.summary}</p> : null}
+                    <div className="article-list-card__bottom">
+                      <div className="article-list-card__tags">{article.tags.map((tag) => <span key={tag}>{tag}</span>)}</div>
+                      <span className="article-list-card__arrow">↗</span>
+                    </div>
+                  </button>
                 </div>
-              </button>
-            ))}
+              );
+            })}
           </div>
         ) : null}
       </div>
@@ -690,6 +713,7 @@ function ArticleListPage({ onOpenArticle }: { onOpenArticle: (slug: string) => v
 function ArticleDetailPage({ slug, onBack }: { slug: string; onBack: () => void }) {
   const [source, setSource] = useState("");
   const [articleTitle, setArticleTitle] = useState("Markdown document");
+  const [coverUrl, setCoverUrl] = useState<string | null>(null);
   const [status, setStatus] = useState<"loading" | "ready" | "error">("loading");
 
   useEffect(() => {
@@ -701,6 +725,7 @@ function ArticleDetailPage({ slug, onBack }: { slug: string; onBack: () => void 
         if (!cancelled) {
           setSource(article.contentMarkdown);
           setArticleTitle(article.title);
+          setCoverUrl(article.coverUrl);
           setStatus("ready");
         }
         return;
@@ -720,6 +745,7 @@ function ArticleDetailPage({ slug, onBack }: { slug: string; onBack: () => void 
         if (!cancelled) {
           setSource(markdown);
           setArticleTitle("First note");
+          setCoverUrl("/article-covers/first-note.svg");
           setStatus("ready");
         }
       } catch {
@@ -736,7 +762,11 @@ function ArticleDetailPage({ slug, onBack }: { slug: string; onBack: () => void 
     <div className="article-page">
       <div className="article-stack">
         <button className="article-back-button" type="button" onClick={onBack}>← 返回文章列表</button>
-        <div className="article-cover-space" aria-label="文章头图预留区域">
+        <div
+          className={`article-cover-space ${coverUrl ? "has-image" : ""}`}
+          aria-label="文章头图"
+          style={coverUrl ? { backgroundImage: `linear-gradient(100deg, rgb(255 255 255 / .38), rgb(255 255 255 / .08)), url("${coverUrl}")` } : undefined}
+        >
           <div className="article-cover-space__label">Article / Cover image</div>
           <div className="article-cover-space__hint">Reserved space for a wide image</div>
         </div>

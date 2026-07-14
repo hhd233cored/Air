@@ -94,11 +94,11 @@ public class ArticleService {
     }
 
     private ArticleSummaryResponse toSummary(Article article) {
-        return new ArticleSummaryResponse(article.getId(), article.getSlug(), article.getTitle(), article.getSummary(), article.getCoverUrl(), Set.copyOf(article.getTags()), article.getStatus(), article.getPublishedAt(), article.getUpdatedAt());
+        return new ArticleSummaryResponse(article.getId(), article.getSlug(), article.getTitle(), article.getSummary(), article.getCoverUrl(), Set.copyOf(article.getTags()), article.getStatus(), article.getPublishedAt(), article.getCreatedAt(), article.getUpdatedAt());
     }
 
     private ArticleResponse toResponse(Article article) {
-        return new ArticleResponse(article.getId(), article.getSlug(), article.getTitle(), article.getSummary(), article.getCoverUrl(), article.getContentMarkdown(), Set.copyOf(article.getTags()), article.getStatus(), article.getPublishedAt(), article.getUpdatedAt());
+        return new ArticleResponse(article.getId(), article.getSlug(), article.getTitle(), article.getSummary(), article.getCoverUrl(), article.getContentMarkdown(), Set.copyOf(article.getTags()), article.getStatus(), article.getPublishedAt(), article.getCreatedAt(), article.getUpdatedAt());
     }
 
     private static String clean(String value) {

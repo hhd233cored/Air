@@ -15,6 +15,7 @@ public record ArticleSummaryResponse(
         Set<String> tags,
         ArticleStatus status,
         Instant publishedAt,
+        Instant createdAt,
         Instant updatedAt
 ) {
 }

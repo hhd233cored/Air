@@ -16,6 +16,7 @@ public record ArticleResponse(
         Set<String> tags,
         ArticleStatus status,
         Instant publishedAt,
+        Instant createdAt,
         Instant updatedAt
 ) {
 }

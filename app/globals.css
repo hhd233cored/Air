@@ -219,8 +219,14 @@ audio { display: none; }
 .article-list-heading h1 { max-width: 660px; margin: 0; color: var(--text); font-size: clamp(34px, 5vw, 58px); font-weight: 500; letter-spacing: -.07em; line-height: 1.04; }
 .article-list-heading > p { max-width: 230px; margin: 0 0 4px; color: var(--muted); font-size: 12px; line-height: 1.7; }
 .article-list-note { margin: -7px 0 16px; color: var(--faint); font-family: var(--font-geist-mono), Consolas, monospace; font-size: 9px; }
-.article-list { display: grid; gap: 13px; }
+.article-timeline { position: relative; display: grid; gap: 15px; padding-left: 105px; }
+.article-timeline::before { position: absolute; top: 18px; bottom: 18px; left: 68px; width: 1px; background: linear-gradient(var(--accent), rgb(79 157 150 / .24)); content: ""; }
+.article-timeline-item { position: relative; min-width: 0; }
+.article-timeline-date { position: absolute; top: 22px; left: -105px; display: flex; width: 74px; flex-direction: column; align-items: flex-end; gap: 3px; color: var(--faint); font-family: var(--font-geist-mono), Consolas, monospace; font-size: 8px; letter-spacing: .03em; line-height: 1.1; }
+.article-timeline-date strong { color: #756783; font-size: 10px; font-weight: 600; }
+.article-timeline-dot { position: absolute; top: 27px; left: -42px; z-index: 1; width: 10px; height: 10px; border: 2px solid var(--background); border-radius: 50%; background: var(--mint); box-shadow: 0 0 0 3px rgb(79 157 150 / .16); }
 .article-list-card { position: relative; display: block; width: 100%; padding: 21px 24px 20px; border-radius: 15px; color: inherit; text-align: left; cursor: pointer; transition: border-color .2s ease, background .2s ease, box-shadow .2s ease, transform .2s ease; }
+.article-list-card.has-cover { background-position: center; background-size: cover; }
 .article-list-card:hover { border-color: rgb(79 157 150 / .32); background: rgb(255 255 255 / .76); box-shadow: 0 15px 35px rgb(104 82 144 / .14); transform: translateY(-2px); }
 .article-list-card__topline { display: flex; align-items: center; justify-content: space-between; gap: 14px; color: var(--faint); font-family: var(--font-geist-mono), Consolas, monospace; font-size: 9px; letter-spacing: .07em; text-transform: uppercase; }
 .article-list-card h2 { max-width: calc(100% - 42px); margin: 17px 0 8px; color: var(--text); font-size: clamp(21px, 3vw, 30px); font-weight: 500; letter-spacing: -.06em; line-height: 1.15; }
@@ -234,6 +240,7 @@ audio { display: none; }
 .article-back-button:hover { color: var(--text); }
 .article-stack { width: min(860px, 100%); margin-inline: auto; }
 .article-cover-space { position: relative; display: flex; height: clamp(180px, 25vw, 290px); flex-direction: column; align-items: flex-start; justify-content: flex-end; gap: 7px; overflow: hidden; padding: 24px 27px; border: 1px solid var(--border); border-radius: 16px 16px 0 0; background: linear-gradient(118deg, rgb(255 255 255 / .72), rgb(226 215 255 / .52) 47%, rgb(220 247 242 / .56)); box-shadow: 0 10px 32px rgb(104 82 144 / .1), inset 0 1px 0 rgb(255 255 255 / .8); }
+.article-cover-space.has-image { background-position: center; background-size: cover; }
 .article-cover-space::before, .article-cover-space::after { position: absolute; border: 1px solid rgb(139 115 201 / .17); border-radius: 50%; content: ""; pointer-events: none; }
 .article-cover-space::before { top: -35%; right: 8%; width: 260px; height: 260px; background: rgb(255 255 255 / .16); }
 .article-cover-space::after { right: 20%; bottom: -45%; width: 220px; height: 220px; background: rgb(220 247 242 / .2); }
@@ -315,6 +322,11 @@ audio { display: none; }
   .article-page { padding-top: 13px; }
   .article-list-heading { align-items: start; flex-direction: column; gap: 13px; }
   .article-list-heading > p { max-width: none; }
+  .article-timeline { padding-left: 54px; }
+  .article-timeline::before { left: 20px; }
+  .article-timeline-date { top: 19px; left: -54px; width: 38px; align-items: flex-start; font-size: 7px; }
+  .article-timeline-date strong { font-size: 8px; }
+  .article-timeline-dot { top: 24px; left: -38px; }
   .article-list-card { padding: 18px 16px 17px; }
   .article-cover-space { height: 175px; padding: 17px 18px; }
   .article-card { padding: 24px 18px 34px; }
