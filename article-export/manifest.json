@@ -1,0 +1,91 @@
+﻿{
+    "format":  "your-space-articles-v1",
+    "exportedAt":  "2026-07-14T05:25:36.3318198Z",
+    "source":  "http://localhost:8080/api/v1",
+    "articles":  [
+                     {
+                         "id":  "55555555-5555-5555-5555-555555555555",
+                         "slug":  "first-note",
+                         "title":  "First note",
+                         "summary":  "The first sample article served by the Java API.",
+                         "coverUrl":  "/article-covers/first-note.svg",
+                         "tags":  [
+                                      "notes"
+                                  ],
+                         "coverFile":  "covers/first-note.svg",
+                         "status":  "PUBLISHED",
+                         "publishedAt":  "2026-07-14T12:00:00Z",
+                         "createdAt":  "2026-07-14T12:00:00Z",
+                         "updatedAt":  "2026-07-14T12:00:00Z",
+                         "contentFile":  "articles/first-note.md"
+                     },
+                     {
+                         "id":  "11111111-1111-1111-1111-111111111111",
+                         "slug":  "quiet-corner",
+                         "title":  "Notes from a quiet corner",
+                         "summary":  "A small collection of thoughts, references, and unfinished ideas.",
+                         "coverUrl":  "/article-covers/quiet-corner.svg",
+                         "tags":  [
+                                      "notes",
+                                      "personal"
+                                  ],
+                         "coverFile":  "covers/quiet-corner.svg",
+                         "status":  "PUBLISHED",
+                         "publishedAt":  "2026-07-13T12:00:00Z",
+                         "createdAt":  "2026-07-13T12:00:00Z",
+                         "updatedAt":  "2026-07-13T12:00:00Z",
+                         "contentFile":  "articles/quiet-corner.md"
+                     },
+                     {
+                         "id":  "22222222-2222-2222-2222-222222222222",
+                         "slug":  "building-a-place-for-notes",
+                         "title":  "Building a place for notes",
+                         "summary":  "Why a personal website should feel more like a room than a feed.",
+                         "coverUrl":  "/article-covers/building-a-place-for-notes.jpg",
+                         "tags":  [
+                                      "notes",
+                                      "design"
+                                  ],
+                         "coverFile":  "covers/building-a-place-for-notes.jpg",
+                         "status":  "PUBLISHED",
+                         "publishedAt":  "2026-07-12T12:00:00Z",
+                         "createdAt":  "2026-07-12T12:00:00Z",
+                         "updatedAt":  "2026-07-12T12:00:00Z",
+                         "contentFile":  "articles/building-a-place-for-notes.md"
+                     },
+                     {
+                         "id":  "33333333-3333-3333-3333-333333333333",
+                         "slug":  "the-weather-of-a-day",
+                         "title":  "The weather of a day",
+                         "summary":  "A short record of light, rain, and the small changes between them.",
+                         "coverUrl":  "/article-covers/the-weather-of-a-day.svg",
+                         "tags":  [
+                                      "diary",
+                                      "observations"
+                                  ],
+                         "coverFile":  "covers/the-weather-of-a-day.svg",
+                         "status":  "PUBLISHED",
+                         "publishedAt":  "2026-07-10T12:00:00Z",
+                         "createdAt":  "2026-07-10T12:00:00Z",
+                         "updatedAt":  "2026-07-10T12:00:00Z",
+                         "contentFile":  "articles/the-weather-of-a-day.md"
+                     },
+                     {
+                         "id":  "44444444-4444-4444-4444-444444444444",
+                         "slug":  "small-things-worth-keeping",
+                         "title":  "Small things worth keeping",
+                         "summary":  "A list of little references collected over one ordinary week.",
+                         "coverUrl":  "/article-covers/small-things-worth-keeping.svg",
+                         "tags":  [
+                                      "links",
+                                      "personal"
+                                  ],
+                         "coverFile":  "covers/small-things-worth-keeping.svg",
+                         "status":  "PUBLISHED",
+                         "publishedAt":  "2026-07-08T12:00:00Z",
+                         "createdAt":  "2026-07-08T12:00:00Z",
+                         "updatedAt":  "2026-07-08T12:00:00Z",
+                         "contentFile":  "articles/small-things-worth-keeping.md"
+                     }
+                 ]
+}

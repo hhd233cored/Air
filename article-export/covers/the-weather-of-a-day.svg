@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 620" preserveAspectRatio="xMidYMid slice">
+  <defs>
+    <linearGradient id="weather-day-bg" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#c8dff1"/><stop offset=".58" stop-color="#f9e4d8"/><stop offset="1" stop-color="#f6cdb9"/></linearGradient>
+  </defs>
+  <rect width="1600" height="620" fill="url(#weather-day-bg)"/>
+  <circle cx="1240" cy="170" r="88" fill="#fff4d4" opacity=".78"/>
+  <g fill="#fff" opacity=".46">
+    <ellipse cx="360" cy="220" rx="170" ry="45"/><ellipse cx="520" cy="190" rx="130" ry="56"/><ellipse cx="690" cy="235" rx="190" ry="42"/>
+  </g>
+  <path d="M0 500 C300 420 550 500 820 440 C1100 380 1320 470 1600 390" fill="none" stroke="#fff" stroke-opacity=".66" stroke-width="4"/>
+  <text x="92" y="120" fill="#52677a" font-family="Georgia,serif" font-size="34" letter-spacing="8">THE WEATHER OF A DAY</text>
+</svg>

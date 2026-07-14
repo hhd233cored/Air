@@ -61,6 +61,7 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                         .requestMatchers(
                                 "/api/v1/health",
+                                "/api/v1/historical-today",
                                 "/api/v1/auth/csrf",
                                 "/api/v1/auth/login",
                                 "/v3/api-docs/**",

@@ -46,3 +46,5 @@ app:
     admin-password: ${AUTH_ADMIN_PASSWORD:}
     user-username: ${AUTH_USER_USERNAME:}
     user-password: ${AUTH_USER_PASSWORD:}
+  wikipedia:
+    on-this-day-url: ${WIKIPEDIA_ON_THIS_DAY_URL:https://api.wikimedia.org/feed/v1/wikipedia/zh/onthisday/all}

@@ -1,6 +1,7 @@
 "use client";
 
 import { type ReactNode, useEffect, useRef, useState } from "react";
+import { apiGet } from "./lib/api/client";
 import { type AuthUser, getCurrentUser, login, logout } from "./lib/api/auth";
 import { type ArticleSummary, getAllPublishedArticles, getPublishedArticle, getPublishedArticles } from "./lib/api/articles";
 
@@ -221,6 +222,98 @@ function useLocalWeather() {
   return { weather, status };
 }
 
+type HistoricalTodayEvent = {
+  year?: number;
+  text?: string;
+};
+
+type HistoricalTodayPayload = {
+  date: string;
+  fetchedAt: string;
+  available: boolean;
+  events: HistoricalTodayEvent[];
+};
+
+function HistoricalTodayPanel({ now }: { now: Date | null }) {
+  const reference = now ?? new Date(2026, 6, 13);
+  const month = String(reference.getMonth() + 1).padStart(2, "0");
+  const day = String(reference.getDate()).padStart(2, "0");
+  const dateKey = `${month}-${day}`;
+  const dateLabel = `${reference.getMonth() + 1}月${reference.getDate()}日`;
+  const [events, setEvents] = useState<HistoricalTodayEvent[]>([]);
+  const [status, setStatus] = useState<"loading" | "ready" | "error">("loading");
+
+  useEffect(() => {
+    let cancelled = false;
+    // This state follows the selected calendar date and is intentionally reset for each day.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setStatus("loading");
+    setEvents([]);
+
+    apiGet<HistoricalTodayPayload>("/historical-today")
+      .then((payload) => {
+        if (cancelled) return;
+        setEvents([...(payload.events ?? [])]
+          .sort((left, right) => (left.year ?? Number.MAX_SAFE_INTEGER) - (right.year ?? Number.MAX_SAFE_INTEGER))
+          .slice(0, 5));
+        setStatus(payload.available ? "ready" : "error");
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setStatus("error");
+      });
+
+    return () => { cancelled = true; };
+  }, [dateKey]);
+
+  return (
+    <section className="calendar-history" aria-label="历史上的今天">
+      <div className="calendar-history__heading">
+        <strong>历史上的今天</strong>
+        <span>{dateLabel}</span>
+      </div>
+      {status === "loading" ? <p className="calendar-history__status">正在读取当天事件…</p> : null}
+      {status === "error" ? <p className="calendar-history__status">暂时无法读取维基百科</p> : null}
+      {status === "ready" && !events.length ? <p className="calendar-history__status">这一天暂时没有可显示的条目</p> : null}
+      <div className="calendar-history__events">
+        {events.map((event, index) => {
+          const content = event.text ?? "";
+          return (
+            <div className="calendar-history__event" key={`${content}-${index}`}>
+              <strong>{event.year ?? "—"}</strong>
+              <p>{content}</p>
+            </div>
+          );
+        })}
+      </div>
+    </section>
+  );
+}
+
+function WeatherPanel() {
+  const { weather, status: weatherStatus } = useLocalWeather();
+  const weatherSummary = weather ? getWeatherSummary(weather.code) : { label: "天气", icon: "◌" };
+  const weatherStatusCopy = weatherStatus === "loading"
+    ? "正在请求位置授权…"
+    : weatherStatus === "denied"
+      ? "允许定位后显示当地天气"
+      : weatherStatus === "unsupported"
+        ? "当前浏览器不支持定位"
+        : "天气服务暂时不可用";
+
+  return (
+    <div className="calendar-weather">
+      <div className="calendar-weather__place">
+        <span className="calendar-weather__icon" aria-hidden="true">{weatherSummary.icon}</span>
+        <div><strong>{weather?.location ?? "你所在的地方"}</strong><small>{weather ? weatherSummary.label : weatherStatusCopy}</small></div>
+      </div>
+      {weather ? (
+        <div className="calendar-weather__reading"><strong>{Math.round(weather.temperature)}°</strong><small>体感 {Math.round(weather.apparentTemperature)}° · 湿度 {weather.humidity}% · 风 {Math.round(weather.windSpeed)}km/h</small></div>
+      ) : null}
+    </div>
+  );
+}
+
 function PageButton({ active, index, label, onClick }: { active: boolean; index: string; label: string; onClick: () => void }) {
   return (
     <button className={`page-button ${active ? "is-active" : ""}`} onClick={onClick} type="button" aria-current={active ? "page" : undefined}>
@@ -338,7 +431,6 @@ function GlassHeader({ eyebrow, title, copy }: { eyebrow: string; title: string;
 }
 
 function CalendarCard({ now }: { now: Date | null }) {
-  const { weather, status: weatherStatus } = useLocalWeather();
   const today = now ?? new Date(2026, 6, 13);
   const [viewDate, setViewDate] = useState<Date | null>(null);
   const reference = viewDate ?? today;
@@ -357,15 +449,6 @@ function CalendarCard({ now }: { now: Date | null }) {
   const changeMonth = (offset: number) => {
     setViewDate(new Date(year, monthIndex + offset, 1));
   };
-  const weatherSummary = weather ? getWeatherSummary(weather.code) : { label: "天气", icon: "◌" };
-  const weatherStatusCopy = weatherStatus === "loading"
-    ? "正在请求位置授权…"
-    : weatherStatus === "denied"
-      ? "允许定位后显示当地天气"
-      : weatherStatus === "unsupported"
-        ? "当前浏览器不支持定位"
-        : "天气服务暂时不可用";
-
   return (
     <article className="glass-card calendar-card dashboard-card">
       <div className="calendar-card__month">
@@ -384,15 +467,7 @@ function CalendarCard({ now }: { now: Date | null }) {
           );
         })}
       </div>
-      <div className="calendar-weather">
-        <div className="calendar-weather__place">
-          <span className="calendar-weather__icon" aria-hidden="true">{weatherSummary.icon}</span>
-          <div><strong>{weather?.location ?? "你所在的地方"}</strong><small>{weather ? weatherSummary.label : weatherStatusCopy}</small></div>
-        </div>
-        {weather ? (
-          <div className="calendar-weather__reading"><strong>{Math.round(weather.temperature)}°</strong><small>体感 {Math.round(weather.apparentTemperature)}° · 湿度 {weather.humidity}% · 风 {Math.round(weather.windSpeed)}km/h</small></div>
-        ) : null}
-      </div>
+      <HistoricalTodayPanel now={now} />
     </article>
   );
 }
@@ -583,10 +658,7 @@ function HomePage({ onPageChange, onOpenArticle, now }: { onPageChange: (page: P
               <span className="card-footer">A thought from today · 2h ago</span>
             </article>
             <article className="glass-card diary-card dashboard-card">
-              <div className="small-card-heading"><p className="card-kicker">06 / 最新说说</p><button className="more-button" type="button">更多</button></div>
-              <div className="diary-icon">✳</div>
-              <h2>Went outside.</h2>
-              <span className="card-footer">Small win · 2026.07.13</span>
+              <WeatherPanel />
             </article>
           </div>
         </div>
