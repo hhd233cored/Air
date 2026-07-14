@@ -56,6 +56,17 @@ function formatArticleCreatedAt(value: string | null) {
   };
 }
 
+function getArticlePreviewLines(markdown: string) {
+  return markdown
+    .replace(/^---[\s\S]*?---\s*/u, "")
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter((line) => line && !/^#{1,6}\s/.test(line) && !/^```/.test(line) && !/^---+$/.test(line))
+    .map((line) => line.replace(/^>\s?/, "").replace(/^[-*]\s+/, "").replace(/^\d+\.\s+/, "").replace(/[`*_]/g, "").trim())
+    .filter(Boolean)
+    .slice(0, 3);
+}
+
 type MusicTrack = { title: string; artist: string; cover: string; src: string };
 
 const netEasePlaylist = {
@@ -645,6 +656,9 @@ function MarkdownContent({ source }: { source: string }) {
 function ArticleListPage({ onOpenArticle }: { onOpenArticle: (slug: string) => void }) {
   const [articles, setArticles] = useState<ArticleSummary[]>([]);
   const [status, setStatus] = useState<"loading" | "ready" | "fallback">("loading");
+  const [hoveredSlug, setHoveredSlug] = useState<string | null>(null);
+  const [previews, setPreviews] = useState<Record<string, string[]>>({});
+  const [previewLoadingSlug, setPreviewLoadingSlug] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -665,6 +679,33 @@ function ArticleListPage({ onOpenArticle }: { onOpenArticle: (slug: string) => v
     return () => { cancelled = true; };
   }, []);
 
+  const loadPreview = async (slug: string) => {
+    if (Object.prototype.hasOwnProperty.call(previews, slug) || previewLoadingSlug === slug) return;
+    setPreviewLoadingSlug(slug);
+    try {
+      let markdown = "";
+      try {
+        const article = await getPublishedArticle(slug);
+        markdown = article.contentMarkdown;
+      } catch {
+        if (slug !== "first-note") throw new Error("preview request failed");
+        const response = await fetch("/articles/first-note.md");
+        if (!response.ok) throw new Error("preview fallback request failed");
+        markdown = await response.text();
+      }
+      setPreviews((current) => ({ ...current, [slug]: getArticlePreviewLines(markdown) }));
+    } catch {
+      setPreviews((current) => ({ ...current, [slug]: [] }));
+    } finally {
+      setPreviewLoadingSlug(null);
+    }
+  };
+
+  const handleArticleHover = (slug: string) => {
+    setHoveredSlug(slug);
+    void loadPreview(slug);
+  };
+
   return (
     <div className="article-page article-list-page">
       <div className="article-list-stack">
@@ -682,19 +723,25 @@ function ArticleListPage({ onOpenArticle }: { onOpenArticle: (slug: string) => v
           <div className="article-timeline" aria-label="文章列表">
             {articles.map((article, index) => {
               const createdAt = formatArticleCreatedAt(article.createdAt);
+              const isHovered = hoveredSlug === article.slug;
               return (
                 <div className="article-timeline-item" key={article.id}>
                   <time className="article-timeline-date" dateTime={article.createdAt ?? undefined}><strong>{createdAt.date}</strong><span>{createdAt.time}</span></time>
                   <span className="article-timeline-dot" aria-hidden="true" />
                   <button
-                    className={`glass-card article-list-card ${article.coverUrl ? "has-cover" : ""}`}
+                    className={`glass-card article-list-card ${article.coverUrl ? "has-cover" : ""} ${isHovered ? "is-hovered" : ""}`}
                     type="button"
                     onClick={() => onOpenArticle(article.slug)}
-                    style={article.coverUrl ? { backgroundImage: `linear-gradient(100deg, rgb(255 255 255 / .96), rgb(255 255 255 / .66)), url("${article.coverUrl}")` } : undefined}
+                    onMouseEnter={() => handleArticleHover(article.slug)}
+                    onMouseLeave={() => setHoveredSlug(null)}
+                    onFocus={() => handleArticleHover(article.slug)}
+                    onBlur={() => setHoveredSlug(null)}
+                    style={article.coverUrl ? { backgroundImage: `linear-gradient(100deg, rgb(255 255 255 / ${isHovered ? ".68" : ".82"}), rgb(255 255 255 / ${isHovered ? ".30" : ".48"})), url("${article.coverUrl}")` } : undefined}
                   >
                     <div className="article-list-card__topline"><span>{String(index + 1).padStart(2, "0")} / Article</span><span>{formatArticleDate(article.publishedAt)}</span></div>
                     <h2>{article.title}</h2>
                     {article.summary ? <p>{article.summary}</p> : null}
+                    {isHovered ? <div className="article-list-card__preview" aria-live="polite">{previewLoadingSlug === article.slug ? <span>正在读取正文…</span> : previews[article.slug]?.map((line, lineIndex) => <span key={`${article.slug}-preview-${lineIndex}`}>{line}</span>)}</div> : null}
                     <div className="article-list-card__bottom">
                       <div className="article-list-card__tags">{article.tags.map((tag) => <span key={tag}>{tag}</span>)}</div>
                       <span className="article-list-card__arrow">↗</span>
