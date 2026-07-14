@@ -2,10 +2,18 @@ spring:
   config:
     activate:
       on-profile: local
+  datasource:
+    url: ${LOCAL_DB_URL:jdbc:h2:file:./backend/data/your-space;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE;DEFAULT_NULL_ORDERING=HIGH}
+    username: ${LOCAL_DB_USERNAME:sa}
+    password: ${LOCAL_DB_PASSWORD:}
+    driver-class-name: org.h2.Driver
   jpa:
+    database-platform: org.hibernate.dialect.H2Dialect
     properties:
       hibernate:
         format_sql: true
+  flyway:
+    locations: classpath:db/migration-h2
 
 logging:
   level:

@@ -14,6 +14,22 @@ docker compose up --build
 
 首次启动或已有数据库升级时，Flyway 会执行示例数据迁移，写入 5 篇已发布的示例文章。重复启动不会重复插入。
 
+## Windows 本地模式（不使用 Docker）
+
+需要先安装 Java 21 和 Maven 3.9+，然后在项目根目录执行：
+
+```powershell
+npm.cmd run backend:local
+```
+
+该命令会启用 `local` profile，使用 H2 文件数据库，数据库文件保存在 `backend/data/`。文章接口和示例数据与 PostgreSQL 模式保持一致。前端仍然使用：
+
+```powershell
+npm.cmd run dev
+```
+
+如果 Maven 没有加入 PATH，也可以在 IDE 中以 `local` profile 启动 `com.yourspace.YourSpaceApplication`。
+
 ## 目录约定
 
 - `src/main/java/com/yourspace/article/`：文章领域的实体、接口、服务和仓储
