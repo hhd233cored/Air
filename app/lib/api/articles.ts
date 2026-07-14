@@ -33,3 +33,17 @@ export function getPublishedArticles(page = 0, size = 3, tag?: string) {
 export function getPublishedArticle(slug: string) {
   return apiGet<ArticleDetail>(`/articles/${encodeURIComponent(slug)}`);
 }
+
+export async function getAllPublishedArticles(pageSize = 50) {
+  const articles: ArticleSummary[] = [];
+  let page = 0;
+
+  while (true) {
+    const response = await getPublishedArticles(page, pageSize);
+    articles.push(...response.content);
+    if (page + 1 >= response.totalPages || response.content.length === 0) break;
+    page += 1;
+  }
+
+  return articles;
+}

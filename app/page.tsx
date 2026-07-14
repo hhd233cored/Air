@@ -1,7 +1,7 @@
 "use client";
 
 import { type ReactNode, useEffect, useRef, useState } from "react";
-import { type ArticleSummary, getPublishedArticle, getPublishedArticles } from "./lib/api/articles";
+import { type ArticleSummary, getAllPublishedArticles, getPublishedArticle, getPublishedArticles } from "./lib/api/articles";
 
 type PageKey = "home" | "projects" | "about" | "article";
 
@@ -22,6 +22,20 @@ const fallbackLatestPosts = [
   { date: "07.13", title: "把网站留一点呼吸感" },
   { date: "06.28", title: "重新理解“完成”这件事" },
   { date: "06.10", title: "三种保持好奇的练习" },
+];
+
+const fallbackArticleList: ArticleSummary[] = [
+  {
+    id: "fallback-first-note",
+    slug: "first-note",
+    title: "First note",
+    summary: "The first sample article served by the Java API.",
+    coverUrl: null,
+    tags: ["notes"],
+    status: "PUBLISHED",
+    publishedAt: "2026-07-14T12:00:00Z",
+    updatedAt: "2026-07-14T12:00:00Z",
+  },
 ];
 
 function formatArticleDate(value: string | null) {
@@ -617,22 +631,86 @@ function MarkdownContent({ source }: { source: string }) {
   return <div className="markdown-content">{blocks}</div>;
 }
 
-function ArticlePage() {
+function ArticleListPage({ onOpenArticle }: { onOpenArticle: (slug: string) => void }) {
+  const [articles, setArticles] = useState<ArticleSummary[]>([]);
+  const [status, setStatus] = useState<"loading" | "ready" | "fallback">("loading");
+
+  useEffect(() => {
+    let cancelled = false;
+    getAllPublishedArticles()
+      .then((result) => {
+        if (!cancelled) {
+          setArticles(result);
+          setStatus("ready");
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setArticles(fallbackArticleList);
+          setStatus("fallback");
+        }
+      });
+
+    return () => { cancelled = true; };
+  }, []);
+
+  return (
+    <div className="article-page article-list-page">
+      <div className="article-list-stack">
+        <div className="article-list-heading">
+          <div>
+            <p className="eyebrow"><span>04</span> / Article archive</p>
+            <h1>All the things worth keeping.</h1>
+          </div>
+          <p>从数据库读取已发布的文章，选择一篇继续阅读。</p>
+        </div>
+
+        {status === "loading" ? <p className="article-state">正在读取文章列表…</p> : null}
+        {status === "fallback" ? <p className="article-list-note">Java API 暂不可用，当前显示本地示例文章。</p> : null}
+        {status !== "loading" ? (
+          <div className="article-list" aria-label="文章列表">
+            {articles.map((article, index) => (
+              <button className="glass-card article-list-card" key={article.id} type="button" onClick={() => onOpenArticle(article.slug)}>
+                <div className="article-list-card__topline"><span>{String(index + 1).padStart(2, "0")} / Article</span><span>{formatArticleDate(article.publishedAt)}</span></div>
+                <h2>{article.title}</h2>
+                {article.summary ? <p>{article.summary}</p> : null}
+                <div className="article-list-card__bottom">
+                  <div className="article-list-card__tags">{article.tags.map((tag) => <span key={tag}>{tag}</span>)}</div>
+                  <span className="article-list-card__arrow">↗</span>
+                </div>
+              </button>
+            ))}
+          </div>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
+function ArticleDetailPage({ slug, onBack }: { slug: string; onBack: () => void }) {
   const [source, setSource] = useState("");
+  const [articleTitle, setArticleTitle] = useState("Markdown document");
   const [status, setStatus] = useState<"loading" | "ready" | "error">("loading");
 
   useEffect(() => {
     let cancelled = false;
+
     const loadArticle = async () => {
       try {
-        const article = await getPublishedArticle("first-note");
+        const article = await getPublishedArticle(slug);
         if (!cancelled) {
           setSource(article.contentMarkdown);
+          setArticleTitle(article.title);
           setStatus("ready");
         }
         return;
       } catch {
         // Fall back to the bundled Markdown demo while the Java API is offline.
+      }
+
+      if (slug !== "first-note") {
+        if (!cancelled) setStatus("error");
+        return;
       }
 
       try {
@@ -641,6 +719,7 @@ function ArticlePage() {
         const markdown = await response.text();
         if (!cancelled) {
           setSource(markdown);
+          setArticleTitle("First note");
           setStatus("ready");
         }
       } catch {
@@ -651,19 +730,20 @@ function ArticlePage() {
     void loadArticle();
 
     return () => { cancelled = true; };
-  }, []);
+  }, [slug]);
 
   return (
     <div className="article-page">
       <div className="article-stack">
+        <button className="article-back-button" type="button" onClick={onBack}>← 返回文章列表</button>
         <div className="article-cover-space" aria-label="文章头图预留区域">
           <div className="article-cover-space__label">Article / Cover image</div>
           <div className="article-cover-space__hint">Reserved space for a wide image</div>
         </div>
         <article className="glass-card article-card">
-          <div className="article-card__meta"><span>04 / Article</span><span>Markdown document</span></div>
+          <div className="article-card__meta"><span>04 / Article</span><span>{articleTitle}</span></div>
           {status === "loading" ? <p className="article-state">正在读取 Markdown…</p> : null}
-          {status === "error" ? <p className="article-state">暂时无法读取文章内容，请检查 Markdown 文件。</p> : null}
+          {status === "error" ? <p className="article-state">暂时无法读取文章内容，请检查 Java API 或 Markdown 文件。</p> : null}
           {status === "ready" ? <MarkdownContent source={source} /> : null}
         </article>
       </div>
@@ -673,6 +753,7 @@ function ArticlePage() {
 
 export default function Home() {
   const [activePage, setActivePage] = useState<PageKey>("home");
+  const [selectedArticleSlug, setSelectedArticleSlug] = useState<string | null>(null);
   const now = useCurrentTime();
 
   return (
@@ -693,7 +774,7 @@ export default function Home() {
         <div className="brand"><span className="brand-mark">✦</span><span>YOUR <i>/</i> SPACE</span></div>
         <div className="search-pill"><span>⌕</span><span>Search this space...</span><kbd>⌘ K</kbd></div>
         <nav className="page-nav" aria-label="页面切换">
-          {navigation.map((item) => <PageButton key={item.id} active={activePage === item.id} index={item.index} label={item.label} onClick={() => setActivePage(item.id)} />)}
+          {navigation.map((item) => <PageButton key={item.id} active={activePage === item.id} index={item.index} label={item.label} onClick={() => { setActivePage(item.id); setSelectedArticleSlug(null); }} />)}
         </nav>
         <div className="header-status"><span className="status-dot" /> <span>Online-ish</span></div>
         </div>
@@ -705,7 +786,9 @@ export default function Home() {
         {activePage === "home" && <HomePage onPageChange={setActivePage} now={now} />}
         {activePage === "projects" && <ProjectsPage />}
         {activePage === "about" && <AboutPage />}
-        {activePage === "article" && <ArticlePage />}
+        {activePage === "article" && (selectedArticleSlug
+          ? <ArticleDetailPage key={selectedArticleSlug} slug={selectedArticleSlug} onBack={() => setSelectedArticleSlug(null)} />
+          : <ArticleListPage onOpenArticle={setSelectedArticleSlug} />)}
       </div>
 
       {activePage !== "article" ? <footer className="site-footer shell"><span>© 2026 Your Name</span><span>Made with patience &amp; curiosity.</span><span>v.01</span></footer> : null}
