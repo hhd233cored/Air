@@ -1,6 +1,7 @@
 param(
     [string]$BaseUrl = "http://localhost:8080",
     [string]$OutputDirectory = ".\article-export",
+    [string]$PublicDirectory = ".\public",
     [int]$PageSize = 50
 )
 
@@ -8,8 +9,11 @@ $ErrorActionPreference = "Stop"
 $apiRoot = "$($BaseUrl.TrimEnd('/'))/api/v1"
 $outputRoot = [System.IO.Path]::GetFullPath($OutputDirectory)
 $articlesDirectory = Join-Path $outputRoot "articles"
+$coversDirectory = Join-Path $outputRoot "covers"
+$publicRoot = [System.IO.Path]::GetFullPath($PublicDirectory)
 
 New-Item -ItemType Directory -Path $articlesDirectory -Force | Out-Null
+New-Item -ItemType Directory -Path $coversDirectory -Force | Out-Null
 
 $articles = @()
 $page = 0
@@ -31,6 +35,33 @@ foreach ($article in $articles) {
     $contentPath = Join-Path $outputRoot $contentFile.Replace('/', '\')
     [System.IO.File]::WriteAllText($contentPath, [string]$detail.contentMarkdown, [System.Text.UTF8Encoding]::new($false))
 
+    $coverFile = $null
+    if (-not [string]::IsNullOrWhiteSpace([string]$detail.coverUrl)) {
+        $coverUrl = [string]$detail.coverUrl
+        $coverPathPart = ($coverUrl -split '[?#]', 2)[0]
+        $extension = [System.IO.Path]::GetExtension($coverPathPart)
+        if ([string]::IsNullOrWhiteSpace($extension) -or $extension.Length -gt 8) { $extension = ".img" }
+        $coverFile = "covers/$safeSlug$extension"
+        $coverPath = Join-Path $outputRoot $coverFile.Replace('/', '\')
+
+        try {
+            if ($coverUrl.StartsWith('/')) {
+                $sourceCoverPath = Join-Path $publicRoot $coverUrl.TrimStart('/').Replace('/', '\')
+                if (-not (Test-Path -LiteralPath $sourceCoverPath)) { throw "Local cover not found: $sourceCoverPath" }
+                Copy-Item -LiteralPath $sourceCoverPath -Destination $coverPath -Force
+            } elseif ($coverUrl -match '^https?://') {
+                Invoke-WebRequest -Uri $coverUrl -OutFile $coverPath -UseBasicParsing
+            } else {
+                $sourceCoverPath = Join-Path $publicRoot $coverUrl.Replace('/', '\')
+                if (-not (Test-Path -LiteralPath $sourceCoverPath)) { throw "Local cover not found: $sourceCoverPath" }
+                Copy-Item -LiteralPath $sourceCoverPath -Destination $coverPath -Force
+            }
+        } catch {
+            Write-Warning "Cover export skipped for $($detail.slug): $($_.Exception.Message)"
+            $coverFile = $null
+        }
+    }
+
     $manifestArticles += [ordered]@{
         id = $detail.id
         slug = $detail.slug
@@ -38,6 +69,7 @@ foreach ($article in $articles) {
         summary = $detail.summary
         coverUrl = $detail.coverUrl
         tags = @($detail.tags)
+        coverFile = $coverFile
         status = $detail.status
         publishedAt = $detail.publishedAt
         createdAt = $detail.createdAt

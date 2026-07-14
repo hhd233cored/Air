@@ -1,6 +1,7 @@
 param(
     [string]$BaseUrl = "http://localhost:8080",
     [string]$InputDirectory = ".\article-export",
+    [string]$PublicDirectory = ".\public",
     [switch]$Publish,
     [switch]$UpdateExisting
 )
@@ -8,6 +9,7 @@ param(
 $ErrorActionPreference = "Stop"
 $apiRoot = "$($BaseUrl.TrimEnd('/'))/api/v1"
 $inputRoot = [System.IO.Path]::GetFullPath($InputDirectory)
+$publicRoot = [System.IO.Path]::GetFullPath($PublicDirectory)
 $manifestPath = Join-Path $inputRoot "manifest.json"
 
 if (-not (Test-Path -LiteralPath $manifestPath)) {
@@ -38,11 +40,27 @@ foreach ($item in @($manifest.articles)) {
         continue
     }
 
+    $coverUrl = [string]$item.coverUrl
+    $coverFile = [string]$item.coverFile
+    if (-not [string]::IsNullOrWhiteSpace($coverFile)) {
+        $exportedCoverPath = Join-Path $inputRoot $coverFile.Replace('/', '\')
+        if (Test-Path -LiteralPath $exportedCoverPath) {
+            $coverName = [System.IO.Path]::GetFileName($exportedCoverPath)
+            $coverTargetUrl = if ($coverUrl.StartsWith('/')) { $coverUrl } else { "/article-covers/$coverName" }
+            $coverTargetPath = Join-Path $publicRoot $coverTargetUrl.TrimStart('/').Replace('/', '\')
+            New-Item -ItemType Directory -Path (Split-Path -Parent $coverTargetPath) -Force | Out-Null
+            Copy-Item -LiteralPath $exportedCoverPath -Destination $coverTargetPath -Force
+            $coverUrl = $coverTargetUrl
+        } else {
+            Write-Warning "Cover file not found for $($item.slug): $exportedCoverPath"
+        }
+    }
+
     $payload = [ordered]@{
         slug = $item.slug
         title = $item.title
         summary = $item.summary
-        coverUrl = $item.coverUrl
+        coverUrl = if ([string]::IsNullOrWhiteSpace($coverUrl)) { $null } else { $coverUrl }
         contentMarkdown = Get-Content -LiteralPath $contentPath -Raw -Encoding utf8
         tags = @($item.tags)
     }

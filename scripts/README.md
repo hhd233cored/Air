@@ -18,6 +18,9 @@ article-export/
   articles/
     first-note.md
     ...
+  covers/
+    first-note.svg
+    ...
 ```
 
 ## Import
@@ -40,4 +43,4 @@ Update existing articles with the same slug instead of creating duplicates:
 powershell -ExecutionPolicy Bypass -File scripts/import-articles.ps1 -UpdateExisting -Publish
 ```
 
-The scripts export and import `coverUrl` as article metadata. The image file itself is not copied; local cover URLs such as `/article-covers/first-note.svg` must exist in the target frontend's `public/` directory.
+The scripts export `coverUrl` and copy cover files into `covers/`. During import, cover files are copied into the target frontend's `public/` directory and the article is updated to use the local `/article-covers/...` path. Use `-PublicDirectory` if the frontend public directory is elsewhere.
