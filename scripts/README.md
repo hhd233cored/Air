@@ -31,6 +31,8 @@ article-export/
 - `articles/` 保存 Markdown 正文
 - `covers/` 保存文章封面文件
 
+封面支持 `SVG`、`PNG`、`JPG/JPEG` 和 `WebP` 格式，导出时会保留原始扩展名。
+
 如果前端的静态资源目录不是默认的 `public/`，可以指定：
 
 ```powershell

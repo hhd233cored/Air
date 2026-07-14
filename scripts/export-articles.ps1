@@ -40,7 +40,12 @@ foreach ($article in $articles) {
         $coverUrl = [string]$detail.coverUrl
         $coverPathPart = ($coverUrl -split '[?#]', 2)[0]
         $extension = [System.IO.Path]::GetExtension($coverPathPart)
-        if ([string]::IsNullOrWhiteSpace($extension) -or $extension.Length -gt 8) { $extension = ".img" }
+        $supportedExtensions = @('.svg', '.png', '.jpg', '.jpeg', '.webp')
+        if ([string]::IsNullOrWhiteSpace($extension)) { $extension = ".img" }
+        $extension = $extension.ToLowerInvariant()
+        if ($supportedExtensions -notcontains $extension) {
+            Write-Warning "Cover format is not one of SVG/PNG/JPG/JPEG/WebP for $($detail.slug): $extension"
+        }
         $coverFile = "covers/$safeSlug$extension"
         $coverPath = Join-Path $outputRoot $coverFile.Replace('/', '\')
 

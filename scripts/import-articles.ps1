@@ -46,6 +46,11 @@ foreach ($item in @($manifest.articles)) {
         $exportedCoverPath = Join-Path $inputRoot $coverFile.Replace('/', '\')
         if (Test-Path -LiteralPath $exportedCoverPath) {
             $coverName = [System.IO.Path]::GetFileName($exportedCoverPath)
+            $coverExtension = [System.IO.Path]::GetExtension($coverName).ToLowerInvariant()
+            $supportedExtensions = @('.svg', '.png', '.jpg', '.jpeg', '.webp')
+            if ($supportedExtensions -notcontains $coverExtension) {
+                Write-Warning "Cover format is not one of SVG/PNG/JPG/JPEG/WebP for $($item.slug): $coverExtension"
+            }
             $coverTargetUrl = if ($coverUrl.StartsWith('/')) { $coverUrl } else { "/article-covers/$coverName" }
             $coverTargetPath = Join-Path $publicRoot $coverTargetUrl.TrimStart('/').Replace('/', '\')
             New-Item -ItemType Directory -Path (Split-Path -Parent $coverTargetPath) -Force | Out-Null
