@@ -2,6 +2,7 @@ param(
     [string]$BaseUrl = "http://localhost:8080",
     [string]$InputDirectory = ".\article-export",
     [string]$PublicDirectory = ".\public",
+    [int]$TimeoutSec = 15,
     [switch]$Publish,
     [switch]$UpdateExisting
 )
@@ -21,11 +22,29 @@ if ($manifest.format -ne "your-space-articles-v1") {
     throw "Unsupported article export format: $($manifest.format)"
 }
 
+function Invoke-ArticleApi {
+    param(
+        [string]$Uri,
+        [string]$Method = "Get",
+        [string]$Body,
+        [string]$ContentType
+    )
+
+    $requestArgs = @{
+        Uri = $Uri
+        Method = $Method
+        TimeoutSec = $TimeoutSec
+    }
+    if (-not [string]::IsNullOrWhiteSpace($Body)) { $requestArgs.Body = $Body }
+    if (-not [string]::IsNullOrWhiteSpace($ContentType)) { $requestArgs.ContentType = $ContentType }
+    Invoke-RestMethod @requestArgs
+}
+
 $existingBySlug = @{}
 if ($UpdateExisting) {
     $page = 0
     do {
-        $response = Invoke-RestMethod -Uri "$apiRoot/articles?page=$page&size=50" -Method Get
+        $response = Invoke-ArticleApi -Uri "$apiRoot/articles?page=$page&size=50"
         foreach ($article in @($response.content)) {
             $existingBySlug[$article.slug] = $article
         }
@@ -34,6 +53,7 @@ if ($UpdateExisting) {
 }
 
 foreach ($item in @($manifest.articles)) {
+    Write-Host "Processing $($item.slug)..."
     $contentPath = Join-Path $inputRoot ([string]$item.contentFile).Replace('/', '\')
     if (-not (Test-Path -LiteralPath $contentPath)) {
         Write-Warning "Skipped $($item.slug): Markdown file not found at $contentPath"
@@ -54,7 +74,11 @@ foreach ($item in @($manifest.articles)) {
             $coverTargetUrl = if ($coverUrl.StartsWith('/')) { $coverUrl } else { "/article-covers/$coverName" }
             $coverTargetPath = Join-Path $publicRoot $coverTargetUrl.TrimStart('/').Replace('/', '\')
             New-Item -ItemType Directory -Path (Split-Path -Parent $coverTargetPath) -Force | Out-Null
-            Copy-Item -LiteralPath $exportedCoverPath -Destination $coverTargetPath -Force
+            $sourceFullPath = [System.IO.Path]::GetFullPath($exportedCoverPath)
+            $targetFullPath = [System.IO.Path]::GetFullPath($coverTargetPath)
+            if ($sourceFullPath -ne $targetFullPath) {
+                [System.IO.File]::Copy($sourceFullPath, $targetFullPath, $true)
+            }
             $coverUrl = $coverTargetUrl
         } else {
             Write-Warning "Cover file not found for $($item.slug): $exportedCoverPath"
@@ -66,22 +90,22 @@ foreach ($item in @($manifest.articles)) {
         title = $item.title
         summary = $item.summary
         coverUrl = if ([string]::IsNullOrWhiteSpace($coverUrl)) { $null } else { $coverUrl }
-        contentMarkdown = Get-Content -LiteralPath $contentPath -Raw -Encoding utf8
+        contentMarkdown = [System.IO.File]::ReadAllText($contentPath, [System.Text.Encoding]::UTF8)
         tags = @($item.tags)
     }
     $json = $payload | ConvertTo-Json -Depth 8
     $existing = if ($UpdateExisting) { $existingBySlug[$item.slug] } else { $null }
 
     if ($existing) {
-        $result = Invoke-RestMethod -Uri "$apiRoot/articles/$($existing.id)" -Method Put -ContentType "application/json; charset=utf-8" -Body $json
+        $result = Invoke-ArticleApi -Uri "$apiRoot/articles/$($existing.id)" -Method Put -ContentType "application/json; charset=utf-8" -Body $json
         $action = "updated"
     } else {
-        $result = Invoke-RestMethod -Uri "$apiRoot/articles" -Method Post -ContentType "application/json; charset=utf-8" -Body $json
+        $result = Invoke-ArticleApi -Uri "$apiRoot/articles" -Method Post -ContentType "application/json; charset=utf-8" -Body $json
         $action = "created"
     }
 
     if ($Publish -and $result.status -ne "PUBLISHED") {
-        $result = Invoke-RestMethod -Uri "$apiRoot/articles/$($result.id)/publish" -Method Post
+        $result = Invoke-ArticleApi -Uri "$apiRoot/articles/$($result.id)/publish" -Method Post
         $action = "$action and published"
     }
 

@@ -62,3 +62,9 @@ powershell -ExecutionPolicy Bypass -File scripts/import-articles.ps1 -UpdateExis
 ```
 
 导入时，封面会复制到目标前端的 `public/article-covers/`，文章会使用对应的本地 `/article-covers/...` 路径。若目标前端的静态资源目录不同，请使用 `-PublicDirectory` 指定。
+
+脚本默认对每个 API 请求等待最多 15 秒，并会显示当前处理的文章。可以通过 `-TimeoutSec` 调整超时时间，例如：
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts/import-articles.ps1 -UpdateExisting -Publish -TimeoutSec 30
+```
