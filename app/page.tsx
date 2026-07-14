@@ -40,11 +40,11 @@ const fallbackArticleList: ArticleSummary[] = [
 ];
 
 const articleMaskColors: Record<string, string> = {
-  "first-note": "91 78 121",
-  "quiet-corner": "139 103 119",
-  "building-a-place-for-notes": "70 111 107",
-  "the-weather-of-a-day": "151 112 84",
-  "small-things-worth-keeping": "143 103 84",
+  "first-note": "110 101 127",
+  "quiet-corner": "153 129 141",
+  "building-a-place-for-notes": "112 137 134",
+  "the-weather-of-a-day": "163 135 117",
+  "small-things-worth-keeping": "158 132 118",
 };
 
 function formatArticleDate(value: string | null) {
