@@ -744,7 +744,7 @@ function ArticleListPage({ onOpenArticle }: { onOpenArticle: (slug: string) => v
                     onMouseLeave={() => setHoveredSlug(null)}
                     onFocus={() => handleArticleHover(article.slug)}
                     onBlur={() => setHoveredSlug(null)}
-                    style={article.coverUrl ? { "--article-mask-rgb": articleMaskColors[article.slug] ?? "48 39 65", backgroundImage: `linear-gradient(100deg, rgb(255 255 255 / .82), rgb(255 255 255 / .48)), url("${article.coverUrl}")` } as React.CSSProperties : undefined}
+                    style={article.coverUrl ? { "--article-mask-rgb": articleMaskColors[article.slug] ?? "48 39 65", backgroundImage: `url("${article.coverUrl}")` } as React.CSSProperties : undefined}
                   >
                     <div className="article-list-card__topline"><span>{String(index + 1).padStart(2, "0")} / Article</span><span>{formatArticleDate(article.publishedAt)}</span></div>
                     <h2>{article.title}</h2>
