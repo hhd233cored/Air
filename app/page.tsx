@@ -269,7 +269,7 @@ function HistoricalTodayPanel({ now }: { now: Date | null }) {
   return (
     <section className="calendar-history" aria-label="历史上的今天">
       <div className="calendar-history__heading">
-        <strong>历史上的今天</strong>
+        <strong>歷史上的今天</strong>
         <span>{dateLabel}</span>
       </div>
       {status === "loading" ? <p className="calendar-history__status">正在读取当天事件…</p> : null}
@@ -402,7 +402,7 @@ function useCurrentTime() {
 }
 
 function ClockDisplay({ now }: { now: Date | null }) {
-  const time = now ? new Intl.DateTimeFormat("zh-CN", { hour: "2-digit", minute: "2-digit", hour12: false }).format(now) : "--:--";
+  const time = now ? new Intl.DateTimeFormat("zh-CN", { hour: "2-digit", minute: "2-digit", hour12: false }).format(now).split("").join(" ") : "--:--";
   const gregorianDate = now ? new Intl.DateTimeFormat("zh-CN", { year: "numeric", month: "long", day: "numeric" }).format(now) : "正在读取日期";
   const weekday = now ? new Intl.DateTimeFormat("zh-CN", { weekday: "long" }).format(now) : "正在读取星期";
   const lunarParts = now ? getLunarParts(now) : null;
@@ -626,18 +626,30 @@ function HomePage({ onPageChange, onOpenArticle, now }: { onPageChange: (page: P
     <>
       <div className="dashboard-grid">
         <article className="glass-card profile-card dashboard-card dashboard-card--profile">
-          <div className="card-topline"><span>01 / Profile</span><span>•••</span></div>
+          <div className="card-topline profile-card__topline"><span>Profile</span><span>•••</span></div>
           <div className="profile-main">
-            <div className="avatar">YN</div>
+            <div className="avatar">
+              <img src="/picture/portrait.png" alt="Profile portrait" />
+            </div>
             <div>
-              <p className="card-kicker">Hello, I&apos;m</p>
-              <h2>Your Name</h2>
-              <p className="muted-copy">Designer, developer, and collector of small moments.</p>
+              <h2>S t r I n</h2>
+              <p className="profile-bio">
+                大三、半传统派、喜欢摆烂、社恐到线上。爱好是打机、写歌、看书 <br />
+                主力：C++、C#<br />
+                比较擅长：Qt、Unity、Winform<br />
+                会一点：Postgress、Redis、LangGraph、Docker Compose、Godot、Spring Boot
+              </p>
             </div>
           </div>
           <div className="profile-bottom">
-            <div className="status-line"><span className="status-dot" /> Available for good ideas</div>
-            <button className="inline-button" onClick={() => onPageChange("about")} type="button">More about me ↗</button>
+            <div className="profile-actions">
+              <a className="profile-action" href="https://github.com/hhd233cored" target="_blank" rel="noreferrer" aria-label="GitHub">
+                <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M12 2.5a9.5 9.5 0 0 0-3 18.51c.48.09.66-.21.66-.46v-1.68c-2.7.59-3.27-1.14-3.27-1.14-.44-1.13-1.08-1.43-1.08-1.43-.88-.6.07-.59.07-.59.97.07 1.48.99 1.48.99.87 1.48 2.28 1.05 2.84.8.09-.63.34-1.05.62-1.29-2.16-.25-4.43-1.08-4.43-4.81 0-1.06.38-1.93.99-2.61-.1-.25-.43-1.31.09-2.58 0 0 .81-.26 2.63 1a9.1 9.1 0 0 1 4.8 0c1.82-1.26 2.63-1 2.63-1 .52 1.27.19 2.33.09 2.58.62.68.99 1.55.99 2.61 0 3.74-2.27 4.56-4.44 4.8.35.3.66.88.66 1.78v2.64c0 .25.18.55.67.46A9.5 9.5 0 0 0 12 2.5Z" /></svg>
+              </a>
+              <button className="profile-action profile-action--email" type="button" aria-label="复制邮箱" data-tooltip="st2073181270@outlook.com（点击复制）" onClick={() => void navigator.clipboard?.writeText("st2073181270@outlook.com")}>
+                <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M3.5 5.5h17v13h-17zM4 6l8 6 8-6" /></svg>
+              </button>
+            </div>
           </div>
         </article>
 
@@ -653,9 +665,12 @@ function HomePage({ onPageChange, onOpenArticle, now }: { onPageChange: (page: P
 
           <div className="dashboard-split">
             <article className="glass-card chatter-card dashboard-card">
-              <div className="small-card-heading"><p className="card-kicker">05 / 最新杂谈</p><button className="more-button" type="button">更多</button></div>
-              <div className="chatter-bubble">最近在想：如果生活也有 changelog，会写些什么？</div>
-              <span className="card-footer">A thought from today · 2h ago</span>
+              <div className="small-card-heading"><p className="card-kicker">说说</p><button className="more-button" type="button">更多</button></div>
+              <div className="chatter-list">
+                <div className="chatter-bubble">1.</div>
+                <div className="chatter-bubble">2.</div>
+                <div className="chatter-bubble">3.</div>
+              </div>
             </article>
             <article className="glass-card diary-card dashboard-card">
               <WeatherPanel />
@@ -1042,18 +1057,20 @@ export default function Home() {
         </div>
       </header>
 
-      {activePage !== "article" ? <ClockDisplay now={now} /> : null}
+      <div className={`content-backdrop content-backdrop--${activePage}`}>
+        {activePage !== "article" ? <ClockDisplay now={now} /> : null}
 
-      <div className="workspace-shell shell">
-        {activePage === "home" && <HomePage onPageChange={setActivePage} onOpenArticle={(slug) => { setSelectedArticleSlug(slug); setActivePage("article"); }} now={now} />}
-        {activePage === "projects" && <ProjectsPage />}
-        {activePage === "about" && <AboutPage />}
-        {activePage === "article" && (selectedArticleSlug
-          ? <ArticleDetailPage key={selectedArticleSlug} slug={selectedArticleSlug} onBack={() => setSelectedArticleSlug(null)} />
-          : <ArticleListPage onOpenArticle={setSelectedArticleSlug} />)}
+        <div className="workspace-shell shell">
+          {activePage === "home" && <HomePage onPageChange={setActivePage} onOpenArticle={(slug) => { setSelectedArticleSlug(slug); setActivePage("article"); }} now={now} />}
+          {activePage === "projects" && <ProjectsPage />}
+          {activePage === "about" && <AboutPage />}
+          {activePage === "article" && (selectedArticleSlug
+            ? <ArticleDetailPage key={selectedArticleSlug} slug={selectedArticleSlug} onBack={() => setSelectedArticleSlug(null)} />
+            : <ArticleListPage onOpenArticle={setSelectedArticleSlug} />)}
+        </div>
+
+        {activePage !== "article" ? <footer className="site-footer shell"><span>© 2026 Your Name</span><span>Made with patience &amp; curiosity.</span><span>v.01</span></footer> : null}
       </div>
-
-      {activePage !== "article" ? <footer className="site-footer shell"><span>© 2026 Your Name</span><span>Made with patience &amp; curiosity.</span><span>v.01</span></footer> : null}
     </main>
   );
 }
