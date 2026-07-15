@@ -12,6 +12,13 @@ export class ApiRequestError extends Error {
 
 const apiBaseUrl = (process.env.NEXT_PUBLIC_API_BASE_URL ?? "").replace(/\/$/, "");
 
+export function resolveApiUrl(value: string | null | undefined) {
+  if (!value) return "";
+  if (/^https?:\/\//iu.test(value)) return value;
+  if (!apiBaseUrl) return value;
+  return `${apiBaseUrl}${value.startsWith("/") ? value : `/${value}`}`;
+}
+
 export async function apiRequest<T>(path: string, init: RequestInit = {}): Promise<T> {
   if (!apiBaseUrl) throw new ApiRequestError("Java API base URL is not configured");
 

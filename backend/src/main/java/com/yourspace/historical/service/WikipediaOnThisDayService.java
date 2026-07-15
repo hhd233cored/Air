@@ -5,6 +5,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.yourspace.historical.dto.HistoricalTodayEvent;
 import com.yourspace.historical.dto.HistoricalTodayResponse;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.context.event.ApplicationReadyEvent;
+import org.springframework.context.event.EventListener;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
@@ -61,6 +63,11 @@ public class WikipediaOnThisDayService {
 
     @Scheduled(cron = "0 0 * * * *")
     public void refreshOnTheHour() {
+        getToday();
+    }
+
+    @EventListener(ApplicationReadyEvent.class)
+    public void warmCacheOnStartup() {
         getToday();
     }
 

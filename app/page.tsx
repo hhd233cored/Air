@@ -1,8 +1,10 @@
 "use client";
 
-import { type ReactNode, useEffect, useRef, useState } from "react";
-import { apiGet } from "./lib/api/client";
-import { type ArticleSummary, getAllPublishedArticles, getLocalArticleIndex, getPublishedArticle, getPublishedArticles } from "./lib/api/articles";
+import { type ReactNode, useCallback, useEffect, useRef, useState } from "react";
+import { resolveApiUrl } from "./lib/api/client";
+import { type ArticleSummary, getAllPublishedArticles, getLocalArticleDetail, getLocalArticleIndex, getPublishedArticle, getPublishedArticles, isAbortError } from "./lib/api/articles";
+import { type HistoricalTodayEvent, getHistoricalToday } from "./lib/api/historical";
+import { getMusicPlaylist, getMusicTrackUrl, type MusicTrackSummary } from "./lib/api/music";
 
 type PageKey = "home" | "projects" | "about" | "article";
 
@@ -63,16 +65,25 @@ function getArticlePreviewLines(markdown: string) {
     .slice(0, 3);
 }
 
-type MusicTrack = { title: string; artist: string; cover: string; src: string };
+type MusicTrack = MusicTrackSummary & { cover: string; src: string };
 
 const netEasePlaylist = {
   id: "17434435787",
   url: "https://music.163.com/playlist?id=17434435787&uct2=U2FsdGVkX1/aYcJTaeB05yIdBqaMhTtFRVoB4Mt6mAg=",
 };
 
-// Playlist tracks will be populated after the playlist API/proxy is connected.
-const musicTracks: MusicTrack[] = [];
-const emptyMusicTrack: MusicTrack = { title: "暂无歌曲", artist: "", cover: "", src: "" };
+const emptyMusicTrack: MusicTrack = {
+  id: "",
+  title: "暂无歌曲",
+  artist: "",
+  album: null,
+  coverUrl: null,
+  durationMs: null,
+  canPlay: false,
+  freeTrial: false,
+  cover: "",
+  src: "",
+};
 
 const lunarDayNames = ["", "初一", "初二", "初三", "初四", "初五", "初六", "初七", "初八", "初九", "初十", "十一", "十二", "十三", "十四", "十五", "十六", "十七", "十八", "十九", "二十", "廿一", "廿二", "廿三", "廿四", "廿五", "廿六", "廿七", "廿八", "廿九", "三十"];
 
@@ -144,6 +155,72 @@ type WeatherState = {
 
 type WeatherStatus = "loading" | "ready" | "denied" | "error" | "unsupported";
 
+const WEATHER_CACHE_TTL_MS = 10 * 60 * 1000;
+const weatherCache = new Map<string, { value: WeatherState; expiresAt: number }>();
+const weatherRequests = new Map<string, Promise<WeatherState>>();
+
+function weatherCacheKey(latitude: number, longitude: number) {
+  return `${latitude.toFixed(2)},${longitude.toFixed(2)}`;
+}
+
+async function requestWeather(latitude: number, longitude: number): Promise<WeatherState> {
+  const weatherUrl = new URL("https://api.open-meteo.com/v1/forecast");
+  weatherUrl.search = new URLSearchParams({
+    latitude: String(latitude),
+    longitude: String(longitude),
+    current: "temperature_2m,relative_humidity_2m,apparent_temperature,weather_code,wind_speed_10m",
+    timezone: "auto",
+  }).toString();
+  const weatherResponse = await fetch(weatherUrl);
+  if (!weatherResponse.ok) throw new Error("weather request failed");
+  const weatherPayload = await weatherResponse.json() as { current?: Record<string, number> };
+  if (!weatherPayload.current) throw new Error("weather data missing");
+
+  let location = "当前位置";
+  try {
+    const locationUrl = new URL("https://nominatim.openstreetmap.org/reverse");
+    locationUrl.search = new URLSearchParams({ lat: String(latitude), lon: String(longitude), format: "jsonv2", "accept-language": "zh-CN" }).toString();
+    const locationResponse = await fetch(locationUrl);
+    if (!locationResponse.ok) throw new Error("location request failed");
+    const locationPayload = await locationResponse.json() as { address?: Record<string, string> };
+    const address = locationPayload.address;
+    const city = address?.state_district ?? address?.city ?? address?.municipality ?? address?.state;
+    const district = address?.district ?? address?.city_district ?? (address?.county !== city ? address?.county : undefined);
+    location = [city, district].filter((part, index, parts) => part && parts.indexOf(part) === index).join(" ") || location;
+  } catch {
+    // Weather still works when reverse geocoding is unavailable.
+  }
+
+  return {
+    location,
+    temperature: weatherPayload.current.temperature_2m,
+    apparentTemperature: weatherPayload.current.apparent_temperature,
+    humidity: weatherPayload.current.relative_humidity_2m,
+    windSpeed: weatherPayload.current.wind_speed_10m,
+    code: weatherPayload.current.weather_code,
+  };
+}
+
+function getWeather(latitude: number, longitude: number) {
+  const key = weatherCacheKey(latitude, longitude);
+  const cached = weatherCache.get(key);
+  if (cached && cached.expiresAt > Date.now()) return Promise.resolve(cached.value);
+  if (cached) weatherCache.delete(key);
+  const current = weatherRequests.get(key);
+  if (current) return current;
+
+  const request = requestWeather(latitude, longitude)
+    .then((value) => {
+      weatherCache.set(key, { value, expiresAt: Date.now() + WEATHER_CACHE_TTL_MS });
+      return value;
+    })
+    .finally(() => {
+      if (weatherRequests.get(key) === request) weatherRequests.delete(key);
+    });
+  weatherRequests.set(key, request);
+  return request;
+}
+
 function getWeatherSummary(code: number) {
   if (code === 0) return { label: "晴", icon: "☀" };
   if (code <= 3) return { label: "多云", icon: "☁" };
@@ -169,48 +246,16 @@ function useLocalWeather() {
       return () => { cancelled = true; };
     }
 
-    navigator.geolocation.getCurrentPosition(async ({ coords }) => {
-      try {
-        const weatherUrl = new URL("https://api.open-meteo.com/v1/forecast");
-        weatherUrl.search = new URLSearchParams({
-          latitude: String(coords.latitude),
-          longitude: String(coords.longitude),
-          current: "temperature_2m,relative_humidity_2m,apparent_temperature,weather_code,wind_speed_10m",
-          timezone: "auto",
-        }).toString();
-        const weatherResponse = await fetch(weatherUrl);
-        if (!weatherResponse.ok) throw new Error("weather request failed");
-        const weatherPayload = await weatherResponse.json() as { current?: Record<string, number> };
-        if (!weatherPayload.current) throw new Error("weather data missing");
-
-        let location = "当前位置";
-        try {
-          const locationUrl = new URL("https://nominatim.openstreetmap.org/reverse");
-          locationUrl.search = new URLSearchParams({ lat: String(coords.latitude), lon: String(coords.longitude), format: "jsonv2", "accept-language": "zh-CN" }).toString();
-          const locationResponse = await fetch(locationUrl);
-          const locationPayload = await locationResponse.json() as { address?: Record<string, string> };
-          const address = locationPayload.address;
-          const city = address?.state_district ?? address?.city ?? address?.municipality ?? address?.state;
-          const district = address?.district ?? address?.city_district ?? (address?.county !== city ? address?.county : undefined);
-          location = [city, district].filter((part, index, parts) => part && parts.indexOf(part) === index).join(" ") || location;
-        } catch {
-          // Weather still works when reverse geocoding is unavailable.
-        }
-
-        if (!cancelled) {
-          setWeather({
-            location,
-            temperature: weatherPayload.current.temperature_2m,
-            apparentTemperature: weatherPayload.current.apparent_temperature,
-            humidity: weatherPayload.current.relative_humidity_2m,
-            windSpeed: weatherPayload.current.wind_speed_10m,
-            code: weatherPayload.current.weather_code,
-          });
+    navigator.geolocation.getCurrentPosition(({ coords }) => {
+      getWeather(coords.latitude, coords.longitude)
+        .then((value) => {
+          if (cancelled) return;
+          setWeather(value);
           setStatus("ready");
-        }
-      } catch {
-        if (!cancelled) setStatus("error");
-      }
+        })
+        .catch(() => {
+          if (!cancelled) setStatus("error");
+        });
     }, () => {
       if (!cancelled) setStatus("denied");
     }, { enableHighAccuracy: false, maximumAge: 900000, timeout: 10000 });
@@ -221,23 +266,12 @@ function useLocalWeather() {
   return { weather, status };
 }
 
-type HistoricalTodayEvent = {
-  year?: number;
-  text?: string;
-};
-
-type HistoricalTodayPayload = {
-  date: string;
-  fetchedAt: string;
-  available: boolean;
-  events: HistoricalTodayEvent[];
-};
-
 function HistoricalTodayPanel({ now }: { now: Date | null }) {
   const reference = now ?? new Date(2026, 6, 13);
   const month = String(reference.getMonth() + 1).padStart(2, "0");
   const day = String(reference.getDate()).padStart(2, "0");
   const dateKey = `${month}-${day}`;
+  const hourKey = `${reference.getFullYear()}-${month}-${day}-${reference.getHours()}`;
   const dateLabel = `${reference.getMonth() + 1}月${reference.getDate()}日`;
   const [events, setEvents] = useState<HistoricalTodayEvent[]>([]);
   const [status, setStatus] = useState<"loading" | "ready" | "error">("loading");
@@ -249,7 +283,7 @@ function HistoricalTodayPanel({ now }: { now: Date | null }) {
     setStatus("loading");
     setEvents([]);
 
-    apiGet<HistoricalTodayPayload>("/historical-today")
+    getHistoricalToday()
       .then((payload) => {
         if (cancelled) return;
         setEvents([...(payload.events ?? [])]
@@ -263,7 +297,7 @@ function HistoricalTodayPanel({ now }: { now: Date | null }) {
       });
 
     return () => { cancelled = true; };
-  }, [dateKey]);
+  }, [dateKey, hourKey]);
 
   return (
     <section className="calendar-history" aria-label="历史上的今天">
@@ -416,24 +450,80 @@ function formatMusicTime(seconds: number) {
 function MusicPlayerBar({ compact = false }: { compact?: boolean }) {
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const [trackIndex, setTrackIndex] = useState(0);
+  const [musicTracks, setMusicTracks] = useState<MusicTrack[]>([]);
+  const [playlistStatus, setPlaylistStatus] = useState<"loading" | "ready" | "error">("loading");
+  const [playlistSource, setPlaylistSource] = useState<"local" | "netease">("local");
+  const [playlistMessage, setPlaylistMessage] = useState<string | null>(null);
+  const [loadingTrackUrl, setLoadingTrackUrl] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const [volume, setVolume] = useState(0.72);
   const [showVolume, setShowVolume] = useState(false);
   const [showPlaylist, setShowPlaylist] = useState(false);
+  const trackUrlRequestsRef = useRef(new Map<string, Promise<string | null>>());
   const track = musicTracks[trackIndex] ?? emptyMusicTrack;
+
+  useEffect(() => {
+    let cancelled = false;
+    getMusicPlaylist()
+      .then((payload) => {
+        if (cancelled) return;
+        setMusicTracks(payload.tracks.map((item) => ({ ...item, cover: resolveApiUrl(item.coverUrl), src: "" })));
+        setTrackIndex(0);
+        setPlaylistSource(payload.source);
+        setPlaylistMessage(payload.message);
+        setPlaylistStatus(payload.available ? "ready" : "error");
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setPlaylistMessage("歌单暂时无法读取，请检查后端音乐配置。");
+          setPlaylistStatus("error");
+        }
+      });
+
+    return () => { cancelled = true; };
+  }, []);
+
+  const requestTrackUrl = useCallback((selectedTrack: MusicTrack) => {
+    if (!selectedTrack.id || !selectedTrack.canPlay) return Promise.resolve(null);
+    if (selectedTrack.src) return Promise.resolve(selectedTrack.src);
+
+    const existingRequest = trackUrlRequestsRef.current.get(selectedTrack.id);
+    if (existingRequest) return existingRequest;
+
+    const request = getMusicTrackUrl(selectedTrack.id)
+      .then((payload) => {
+        if (!payload.playUrl) return null;
+        const source = resolveApiUrl(payload.playUrl);
+        setMusicTracks((current) => current.map((item) => item.id === selectedTrack.id ? { ...item, src: source } : item));
+        return source;
+      })
+      .catch(() => null)
+      .finally(() => {
+        trackUrlRequestsRef.current.delete(selectedTrack.id);
+      });
+
+    trackUrlRequestsRef.current.set(selectedTrack.id, request);
+    return request;
+  }, []);
+
+  useEffect(() => {
+    if (playlistStatus !== "ready" || !track.id || !track.canPlay || track.src) return;
+
+    void requestTrackUrl(track);
+  }, [playlistStatus, requestTrackUrl, track]);
 
   useEffect(() => {
     const audio = audioRef.current;
     // Reset playback state when the selected external audio resource changes.
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setCurrentTime(0);
-    setDuration(0);
+    setDuration(track.durationMs && track.durationMs > 0 ? track.durationMs / 1000 : 0);
     setIsPlaying(false);
     audio?.pause();
     audio?.load();
-  }, [trackIndex]);
+  }, [track.durationMs, trackIndex]);
 
   useEffect(() => {
     if (audioRef.current) audioRef.current.volume = volume;
@@ -444,49 +534,94 @@ function MusicPlayerBar({ compact = false }: { compact?: boolean }) {
     setTrackIndex((index) => (index + offset + musicTracks.length) % musicTracks.length);
   };
 
+  const ensureTrackUrl = async (selectedTrack: MusicTrack) => {
+    if (!selectedTrack.id) return null;
+    if (selectedTrack.src) return selectedTrack.src;
+
+    setLoadingTrackUrl(true);
+    try {
+      return await requestTrackUrl(selectedTrack);
+    } finally {
+      setLoadingTrackUrl(false);
+    }
+  };
+
   const togglePlayback = async () => {
     const audio = audioRef.current;
-    if (!audio || !track.src) return;
-    if (audio.paused) await audio.play();
-    else audio.pause();
+    if (!audio || !track.id || !track.canPlay || loadingTrackUrl) return;
+    if (!audio.paused) {
+      audio.pause();
+      return;
+    }
+
+    const source = await ensureTrackUrl(track);
+    if (!source) return;
+    audio.src = source;
+    audio.load();
+    if (currentTime > 0) audio.currentTime = currentTime;
+    try {
+      await audio.play();
+    } catch {
+      setIsPlaying(false);
+    }
   };
 
   const seek = (value: number) => {
-    if (!audioRef.current) return;
-    audioRef.current.currentTime = value;
+    const audio = audioRef.current;
+    if (!audio) return;
+    if (audio.src) audio.currentTime = value;
     setCurrentTime(value);
   };
+
+  const progressPercent = duration > 0 ? Math.min(100, Math.max(0, (currentTime / duration) * 100)) : 0;
 
   return (
     <div className={`music-player-block ${compact ? "music-player-block--compact" : ""}`}>
       <article className="music-player-bar">
-        {duration > 0 ? (
-          <div className="music-bar-progress">
-            <input aria-label="播放进度" type="range" min="0" max={duration} step="0.1" value={Math.min(currentTime, duration)} onChange={(event) => seek(Number(event.target.value))} />
-          </div>
-        ) : null}
         <div className="music-bar__track-info">
-          <div className={`music-bar__cover ${isPlaying ? "is-playing" : ""}`} style={track.cover ? { backgroundImage: `url(${track.cover})` } : undefined}><span>♪</span></div>
+          <div className={`music-bar__cover ${isPlaying ? "is-playing" : ""}`} style={track.cover ? { backgroundImage: `url(${track.cover})` } : undefined} />
           {track.title || track.artist ? <div className={`music-bar__track-label ${track.artist ? "" : "is-single"}`}><strong>{track.title}</strong>{track.artist ? <><span className="music-bar__separator"> - </span><small>{track.artist}</small></> : null}</div> : null}
         </div>
         <div className="music-bar__center">
           <div className="music-bar__transport">
             <button type="button" aria-label="随机播放">⤨</button>
             <button type="button" aria-label="上一首" onClick={() => changeTrack(-1)} disabled={!musicTracks.length}>◀</button>
-            <button className="music-bar__play" type="button" aria-label={isPlaying ? "暂停" : "播放"} onClick={togglePlayback} disabled={!track.src}>{isPlaying ? "Ⅱ" : "▶"}</button>
+            <button className="music-bar__play" type="button" aria-label={loadingTrackUrl || !track.src ? "加载播放地址" : isPlaying ? "暂停" : "播放"} onClick={togglePlayback} disabled={!track.id || !track.canPlay || !track.src || loadingTrackUrl}>{loadingTrackUrl || !track.src ? "…" : isPlaying ? "Ⅱ" : "▶"}</button>
             <button type="button" aria-label="下一首" onClick={() => changeTrack(1)} disabled={!musicTracks.length}>▶</button>
             <button type="button" aria-label="显示歌单" aria-expanded={showPlaylist} onClick={() => { setShowPlaylist((visible) => !visible); setShowVolume(false); }}>☷</button>
           </div>
+          {duration > 0 ? (
+            <div className="music-bar-progress">
+              <input aria-label="播放进度" type="range" min="0" max={duration} step="0.1" value={Math.min(currentTime, duration)} style={{ "--music-progress": `${progressPercent}%` } as React.CSSProperties} onChange={(event) => seek(Number(event.target.value))} />
+            </div>
+          ) : null}
           <div className="music-bar__time"><span>{formatMusicTime(currentTime)}</span><span>{formatMusicTime(duration)}</span></div>
         </div>
         <div className="music-bar__actions">
           <button type="button" aria-label="显示音量" aria-expanded={showVolume} onClick={() => { setShowVolume((visible) => !visible); setShowPlaylist(false); }}>◖</button>
-          <button type="button" aria-label="打开网易云歌单" onClick={() => window.open(netEasePlaylist.url, "_blank", "noopener,noreferrer")}>↗</button>
+          {playlistSource === "netease" ? <button type="button" aria-label="打开网易云歌单" onClick={() => window.open(netEasePlaylist.url, "_blank", "noopener,noreferrer")}>↗</button> : null}
         </div>
-        <audio ref={audioRef} src={track.src || undefined} preload="metadata" onPlay={() => setIsPlaying(true)} onPause={() => setIsPlaying(false)} onEnded={() => changeTrack(1)} onLoadedMetadata={(event) => setDuration(event.currentTarget.duration)} onTimeUpdate={(event) => setCurrentTime(event.currentTarget.currentTime)} />
+        <audio ref={audioRef} src={track.src || undefined} preload="metadata" onPlay={() => setIsPlaying(true)} onPause={() => setIsPlaying(false)} onEnded={() => { setIsPlaying(false); setCurrentTime(0); if (audioRef.current) audioRef.current.currentTime = 0; }} onLoadedMetadata={(event) => setDuration(event.currentTarget.duration)} onTimeUpdate={(event) => setCurrentTime(event.currentTarget.currentTime)} />
       </article>
       {showVolume ? <div className="music-popover music-volume-popover"><span>音量</span><input aria-label="音量" type="range" min="0" max="1" step="0.01" value={volume} onChange={(event) => setVolume(Number(event.target.value))} /></div> : null}
-      {showPlaylist ? <div className="music-popover music-playlist-popover"><div><strong>网易云歌单</strong><small>ID {netEasePlaylist.id}</small></div><a href={netEasePlaylist.url} target="_blank" rel="noreferrer">打开歌单 ↗</a><p>歌单界面已隐藏，接入歌曲数据后会在这里展开。</p></div> : null}
+      {showPlaylist ? (
+        <div className="music-popover music-playlist-popover">
+          <div><strong>{playlistSource === "local" ? "本地歌单" : "网易云歌单"}</strong><small>{playlistSource === "local" ? "music/playlist.json" : `ID ${netEasePlaylist.id}`}</small></div>
+          {playlistSource === "netease" ? <a href={netEasePlaylist.url} target="_blank" rel="noreferrer">打开歌单 ↗</a> : null}
+          {playlistStatus === "loading" ? <p>正在读取歌单…</p> : null}
+          {playlistStatus === "error" ? <p>{playlistMessage ?? "歌单暂时无法读取，请检查后端音乐配置。"}</p> : null}
+          {playlistStatus === "ready" ? (
+            <div className="music-playlist-popover__tracks">
+              {musicTracks.map((item, index) => (
+                <button className={`music-playlist-popover__track ${item.canPlay ? "" : "is-unavailable"}`} type="button" key={item.id || `${item.title}-${index}`} onClick={() => { setTrackIndex(index); setShowPlaylist(false); }}>
+                  <span>{index + 1}</span>
+                  <span><strong>{item.title}</strong><small>{item.artist}{item.canPlay ? "" : " · 暂不可播放"}</small></span>
+                </button>
+              ))}
+            </div>
+          ) : null}
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -495,23 +630,31 @@ function HomeArticleCard({ article, onOpenArticle }: { article: ArticleSummary; 
   const [isHovered, setIsHovered] = useState(false);
   const [previewLines, setPreviewLines] = useState<string[]>([]);
   const [previewLoading, setPreviewLoading] = useState(false);
+  const previewAbortRef = useRef<AbortController | null>(null);
 
-  const loadPreview = async () => {
+  useEffect(() => () => previewAbortRef.current?.abort(), []);
+
+  const loadPreview = async (signal: AbortSignal) => {
     if (previewLines.length || previewLoading) return;
     setPreviewLoading(true);
     try {
-      const detail = await getPublishedArticle(article.slug);
+      const detail = await getPublishedArticle(article.slug, signal);
+      if (signal.aborted) return;
       setPreviewLines(getArticlePreviewLines(detail.contentMarkdown));
-    } catch {
+    } catch (error) {
+      if (isAbortError(error)) return;
       setPreviewLines(article.summary ? [article.summary] : []);
     } finally {
-      setPreviewLoading(false);
+      if (previewAbortRef.current?.signal === signal) setPreviewLoading(false);
     }
   };
 
   const handleHover = () => {
+    previewAbortRef.current?.abort();
+    const controller = new AbortController();
+    previewAbortRef.current = controller;
     setIsHovered(true);
-    void loadPreview();
+    void loadPreview(controller.signal);
   };
 
   return (
@@ -520,13 +663,14 @@ function HomeArticleCard({ article, onOpenArticle }: { article: ArticleSummary; 
       type="button"
       onClick={() => onOpenArticle(article.slug)}
       onMouseEnter={handleHover}
-      onMouseLeave={() => setIsHovered(false)}
+      onMouseLeave={() => { setIsHovered(false); previewAbortRef.current?.abort(); }}
       onFocus={handleHover}
-      onBlur={() => setIsHovered(false)}
-      style={article.coverUrl ? { "--article-mask-rgb": articleMaskColors[article.slug] ?? "48 39 65", backgroundImage: `url("${article.coverUrl}")` } as React.CSSProperties : undefined}
+      onBlur={() => { setIsHovered(false); previewAbortRef.current?.abort(); }}
+      style={{ "--article-mask-rgb": articleMaskColors[article.slug] ?? "110 101 127" } as React.CSSProperties}
     >
       {article.coverUrl ? (
         <>
+          <img className="article-list-card__cover" src={article.coverUrl} alt="" loading="eager" decoding="async" />
           <div className="article-list-card__mask">
             <h2 className="article-list-card__mask-title">{article.title}</h2>
             <div className="article-list-card__preview" aria-live="polite"><div className="article-list-card__preview-copy">{isHovered ? (previewLoading ? <span>正在读取正文…</span> : previewLines.map((line, lineIndex) => <span key={`${article.slug}-home-preview-${lineIndex}`}>{line}</span>)) : null}</div></div>
@@ -790,6 +934,9 @@ function ArticleListPage({ onOpenArticle }: { onOpenArticle: (slug: string) => v
   const [hoveredSlug, setHoveredSlug] = useState<string | null>(null);
   const [previews, setPreviews] = useState<Record<string, string[]>>({});
   const [previewLoadingSlug, setPreviewLoadingSlug] = useState<string | null>(null);
+  const previewAbortRef = useRef<AbortController | null>(null);
+
+  useEffect(() => () => previewAbortRef.current?.abort(), []);
 
   useEffect(() => {
     let cancelled = false;
@@ -821,30 +968,43 @@ function ArticleListPage({ onOpenArticle }: { onOpenArticle: (slug: string) => v
     return () => { cancelled = true; };
   }, []);
 
-  const loadPreview = async (slug: string) => {
+  const loadPreview = async (slug: string, signal: AbortSignal) => {
     if (Object.prototype.hasOwnProperty.call(previews, slug) || previewLoadingSlug === slug) return;
     setPreviewLoadingSlug(slug);
     try {
       let markdown = "";
       try {
-        const article = await getPublishedArticle(slug);
+        const article = await getPublishedArticle(slug, signal);
         markdown = article.contentMarkdown;
       } catch {
-        const response = await fetch(`/articles/${encodeURIComponent(slug)}/article.md`);
+        if (signal.aborted) return;
+        const response = await fetch(`/articles/${encodeURIComponent(slug)}/article.md`, { signal, headers: { Accept: "text/markdown" } });
         if (!response.ok) throw new Error("preview fallback request failed");
         markdown = await response.text();
       }
+      if (signal.aborted) return;
       setPreviews((current) => ({ ...current, [slug]: getArticlePreviewLines(markdown) }));
-    } catch {
+    } catch (error) {
+      if (isAbortError(error)) return;
       setPreviews((current) => ({ ...current, [slug]: [] }));
     } finally {
-      setPreviewLoadingSlug(null);
+      if (!signal.aborted) setPreviewLoadingSlug(null);
     }
   };
 
   const handleArticleHover = (slug: string) => {
+    if (hoveredSlug === slug) return;
+    previewAbortRef.current?.abort();
+    const controller = new AbortController();
+    previewAbortRef.current = controller;
     setHoveredSlug(slug);
-    void loadPreview(slug);
+    void loadPreview(slug, controller.signal);
+  };
+
+  const handleArticleLeave = () => {
+    previewAbortRef.current?.abort();
+    setHoveredSlug(null);
+    setPreviewLoadingSlug(null);
   };
 
   return (
@@ -874,13 +1034,14 @@ function ArticleListPage({ onOpenArticle }: { onOpenArticle: (slug: string) => v
                     type="button"
                     onClick={() => onOpenArticle(article.slug)}
                     onMouseEnter={() => handleArticleHover(article.slug)}
-                    onMouseLeave={() => setHoveredSlug(null)}
+                    onMouseLeave={handleArticleLeave}
                     onFocus={() => handleArticleHover(article.slug)}
-                    onBlur={() => setHoveredSlug(null)}
-                    style={article.coverUrl ? { "--article-mask-rgb": articleMaskColors[article.slug] ?? "48 39 65", backgroundImage: `url("${article.coverUrl}")` } as React.CSSProperties : undefined}
+                    onBlur={handleArticleLeave}
+                    style={{ "--article-mask-rgb": articleMaskColors[article.slug] ?? "110 101 127" } as React.CSSProperties}
                   >
                     {article.coverUrl ? (
                       <>
+                        <img className="article-list-card__cover" src={article.coverUrl} alt="" loading="lazy" decoding="async" />
                         <div className="article-list-card__mask">
                           <h2 className="article-list-card__mask-title">{article.title}</h2>
                           <div className="article-list-card__preview" aria-live="polite"><div className="article-list-card__preview-copy">{isHovered ? (previewLoadingSlug === article.slug ? <span>正在读取正文…</span> : previews[article.slug]?.map((line, lineIndex) => <span key={`${article.slug}-preview-${lineIndex}`}>{line}</span>)) : null}</div></div>
@@ -933,14 +1094,9 @@ function ArticleDetailPage({ slug, onBack }: { slug: string; onBack: () => void 
       }
 
       try {
-        const response = await fetch(`/articles/${encodeURIComponent(slug)}/article.md`);
-        if (!response.ok) throw new Error("article request failed");
-        const markdown = await response.text();
-        const localArticles = await getLocalArticleIndex();
-        const localArticle = localArticles.find((article) => article.slug === slug);
-        if (!localArticle) throw new Error("local article metadata not found");
+        const localArticle = await getLocalArticleDetail(slug);
         if (!cancelled) {
-          setSource(markdown);
+          setSource(localArticle.contentMarkdown);
           setArticleTitle(localArticle.title);
           setCoverUrl(localArticle.coverUrl);
           setStatus("ready");
@@ -962,8 +1118,8 @@ function ArticleDetailPage({ slug, onBack }: { slug: string; onBack: () => void 
         <div
           className={`article-cover-space ${coverUrl ? "has-image" : ""}`}
           aria-label="文章头图"
-          style={coverUrl ? { backgroundImage: `url("${coverUrl}")` } : undefined}
         >
+          {coverUrl ? <img className="article-cover-space__image" src={coverUrl} alt="" loading="eager" decoding="async" /> : null}
         </div>
         <article className="glass-card article-card">
           <div className="article-card__meta"><span>{articleTitle}</span></div>
@@ -1009,7 +1165,9 @@ export default function Home() {
         {activePage !== "article" ? <ClockDisplay now={now} /> : null}
 
         <div className="workspace-shell shell">
-          {activePage === "home" && <HomePage onPageChange={setActivePage} onOpenArticle={(slug) => { setSelectedArticleSlug(slug); setActivePage("article"); }} now={now} />}
+          <div className={`home-page-layer ${activePage === "home" ? "" : "is-hidden"}`}>
+            <HomePage onPageChange={setActivePage} onOpenArticle={(slug) => { setSelectedArticleSlug(slug); setActivePage("article"); }} now={now} />
+          </div>
           {activePage === "projects" && <ProjectsPage />}
           {activePage === "about" && <AboutPage />}
           {activePage === "article" && (selectedArticleSlug

@@ -2,24 +2,45 @@
 
 from __future__ import annotations
 
+import asyncio
+from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 
 from fastapi import FastAPI, Query, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, Response
+from fastapi.staticfiles import StaticFiles
 
 from .article_service import ArticleNotFoundError, ArticleService
 from .config import Settings
 from .historical_service import HistoricalTodayService
+from .local_music_service import LocalMusicService
+from .music_models import MusicPlaylistResponse, MusicTrackUrlResponse
+from .music_service import MusicService, MusicServiceError
 from .models import ArticleDetail, ArticlePageResponse, HistoricalTodayResponse
 
 
 settings = Settings.from_environment()
 article_service = ArticleService(settings.article_content_dir)
 historical_service = HistoricalTodayService(settings.wikipedia_on_this_day_url)
+if settings.music_source == "local":
+    music_service = LocalMusicService(settings.music_content_dir)
+elif settings.music_source == "netease":
+    music_service = MusicService(settings)
+else:
+    raise ValueError("MUSIC_SOURCE must be 'local' or 'netease'")
 
-app = FastAPI(title="Your Space Read-only API", docs_url=None, redoc_url=None)
+
+@asynccontextmanager
+async def lifespan(_: FastAPI):
+    # Warm the in-memory cache once after the server starts so the first browser request is fast.
+    await asyncio.to_thread(historical_service.get_today)
+    yield
+
+
+app = FastAPI(title="Your Space Read-only API", docs_url=None, redoc_url=None, lifespan=lifespan)
+app.mount("/music", StaticFiles(directory=settings.music_content_dir), name="music")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=list(settings.cors_allowed_origins),
@@ -60,6 +81,11 @@ async def unexpected_error(request: Request, exception: Exception) -> JSONRespon
     )
 
 
+@app.exception_handler(MusicServiceError)
+async def music_error(request: Request, exception: MusicServiceError) -> JSONResponse:
+    return _error_response(exception.status_code, exception.code, exception.message, request.url.path)
+
+
 @app.get("/api/v1/health")
 def health() -> dict[str, str]:
     return {"status": "UP"}
@@ -82,6 +108,28 @@ def get_article(slug: str) -> ArticleDetail:
 @app.get("/api/v1/historical-today", response_model=HistoricalTodayResponse)
 def historical_today() -> HistoricalTodayResponse:
     return historical_service.get_today()
+
+
+@app.get("/api/v1/music/playlist", response_model=MusicPlaylistResponse)
+def music_playlist() -> MusicPlaylistResponse:
+    return music_service.get_playlist()
+
+
+@app.get("/api/v1/music/tracks/{track_id}/url", response_model=MusicTrackUrlResponse)
+def music_track_url(track_id: str) -> MusicTrackUrlResponse:
+    return music_service.get_track_url(track_id)
+
+
+@app.get("/api/v1/music/tracks/{track_id}/cover")
+def music_track_cover(track_id: str) -> Response:
+    if not isinstance(music_service, LocalMusicService):
+        raise MusicServiceError("MUSIC_COVER_UNAVAILABLE", "当前音乐来源没有本地内嵌封面", 404)
+    content, media_type = music_service.get_track_cover(track_id)
+    return Response(
+        content=content,
+        media_type=media_type,
+        headers={"Cache-Control": "public, max-age=86400"},
+    )
 
 
 def _error_response(status_code: int, code: str, message: str, path: str) -> JSONResponse:

@@ -46,6 +46,8 @@ npm.cmd run dev
 
 前端默认地址为 `http://localhost:3000`，后端默认地址为 `http://localhost:8080`。
 
+网易云音乐播放器使用 Python 后端的代理接口。请将 `.env.example` 中的 `NETEASE_MUSIC_*` 配置复制到本地 `.env` 并填写网易云 OpenAPI 应用参数，然后使用 `npm.cmd run backend:python` 启动后端；前端会自动读取歌单，点击播放时再获取临时播放地址。官方 OpenAPI 的密钥只放在后端环境变量中，不放入前端。
+
 ## 生产打包
 
 ```powershell
@@ -59,6 +61,7 @@ npm.cmd run backend:prod
 
 - `app/`：前端页面、组件和样式
 - `public/articles/`：每篇文章的独立目录
+- `music/`：本地音乐文件和 `playlist.json` 歌单
 - `backend/`：只读 Java API
 - `backend-python/`：只读 FastAPI Python API
 - `scripts/`：文章目录导入导出脚本
@@ -90,5 +93,14 @@ npm.cmd run backend:test     # 后端测试
 npm.cmd run articles:export  # 导出文章目录
 npm.cmd run articles:import  # 导入文章目录
 ```
+
+音乐来源默认使用本地歌单。修改根目录 `.env` 中的 `MUSIC_SOURCE`：
+
+```env
+MUSIC_SOURCE=local       # 使用 music/playlist.json
+MUSIC_SOURCE=netease     # 使用网易云 OpenAPI
+```
+
+本地歌单格式和音频文件放置方式见 `music/README.md`。切换配置后需要重启 Python 后端。
 
 详细说明请查看 [`backend/README.md`](backend/README.md) 和 [`scripts/README.md`](scripts/README.md)。
