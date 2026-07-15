@@ -1,50 +1,19 @@
 server:
   port: ${SERVER_PORT:8080}
-  servlet:
-    session:
-      timeout: ${AUTH_SESSION_TIMEOUT:7d}
-      cookie:
-        name: YOUR_SPACE_SESSION
-        http-only: true
-        secure: ${AUTH_SESSION_COOKIE_SECURE:false}
-        same-site: ${AUTH_SESSION_COOKIE_SAME_SITE:lax}
+  tomcat:
+    threads:
+      max: ${SERVER_TOMCAT_THREADS_MAX:16}
+    max-connections: ${SERVER_TOMCAT_MAX_CONNECTIONS:64}
+    accept-count: ${SERVER_TOMCAT_ACCEPT_COUNT:32}
 
 spring:
   application:
     name: your-space-backend
-  datasource:
-    url: ${DB_URL:jdbc:postgresql://localhost:5432/your_space}
-    username: ${DB_USERNAME:your_space}
-    password: ${DB_PASSWORD:your_space}
-  jpa:
-    open-in-view: false
-    hibernate:
-      ddl-auto: validate
-    properties:
-      hibernate:
-        jdbc:
-          time_zone: UTC
-  flyway:
-    enabled: true
-    locations: classpath:db/migration
-
-management:
-  endpoints:
-    web:
-      exposure:
-        include: health,info
-
-springdoc:
-  swagger-ui:
-    path: /swagger-ui.html
 
 app:
   cors:
     allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:3000,http://127.0.0.1:3000}
-  auth:
-    admin-username: ${AUTH_ADMIN_USERNAME:}
-    admin-password: ${AUTH_ADMIN_PASSWORD:}
-    user-username: ${AUTH_USER_USERNAME:}
-    user-password: ${AUTH_USER_PASSWORD:}
+  articles:
+    directory: ${ARTICLE_CONTENT_DIR:./public/articles}
   wikipedia:
     on-this-day-url: ${WIKIPEDIA_ON_THIS_DAY_URL:https://api.wikimedia.org/feed/v1/wikipedia/zh/onthisday/all}

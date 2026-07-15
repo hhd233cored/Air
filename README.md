@@ -1,15 +1,16 @@
 # Your Space
 
-这是一个个人网站项目，包含 vinext 前端和独立的 Java Spring Boot 后端。
+这是一个轻量化个人博客，包含 vinext 前端和只读 Java Spring Boot API。
 
 ## 环境要求
 
 - Node.js `>=22.13.0`
 - Java 21
-- Maven 3.9+
-- Docker（可选，Windows 本地开发可以不使用）
+- Maven 3.9+（仅本地开发和打包需要）
 
-## 快速启动
+生产服务器不需要 Docker、PostgreSQL 或 Node.js 开发服务。
+
+## 本地启动
 
 安装前端依赖：
 
@@ -17,7 +18,7 @@
 npm.cmd install
 ```
 
-启动 Java 后端（Windows 本地模式，使用 H2 文件数据库）：
+启动只读 Java API：
 
 ```powershell
 npm.cmd run backend:local
@@ -31,35 +32,47 @@ npm.cmd run dev
 
 前端默认地址为 `http://localhost:3000`，后端默认地址为 `http://localhost:8080`。
 
-如果使用 Docker，也可以执行：
+## 生产打包
 
 ```powershell
-docker compose up --build
+npm.cmd run backend:package
+npm.cmd run backend:prod
 ```
+
+生产启动脚本会使用受限 JVM 内存：`Xmx256m`。服务器只需要 Java 21 JRE 和 `public/` 文章目录。
 
 ## 项目结构
 
 - `app/`：前端页面、组件和样式
-- `public/`：静态资源和 Markdown 示例文章
-- `backend/`：Java Spring Boot 后端、实体和数据库迁移
-- `scripts/`：文章 Markdown 与封面图的导入导出脚本
+- `public/articles/`：每篇文章的独立目录
+- `backend/`：只读 Java API
+- `scripts/`：文章目录导入导出脚本
 - `worker/`：Cloudflare Worker 托管入口
+- `legacy/`：旧数据库、鉴权和 Docker 方案，仅作归档
 
-## 文章数据
+## 文章结构
 
-文章元数据和 Markdown 正文保存在数据库中，封面使用 `coverUrl` 保存地址。前端优先从 Java API 获取文章，后端不可用时会回退到 `public/articles/first-note.md` 示例文件。
+```text
+public/articles/first-note/
+  article.json
+  article.md
+  cover.svg
+  assets/
+```
 
-文章导入导出说明请查看 [`scripts/README.md`](scripts/README.md)，后端说明请查看 [`backend/README.md`](backend/README.md)。
+文章列表使用自动生成的 `public/articles/index.json`。正文使用 Markdown，封面支持 SVG、PNG、JPG/JPEG 和 WebP。
 
 ## 常用命令
 
 ```powershell
-npm.cmd run dev              # 启动前端开发服务器
-npm.cmd run build            # 构建前端
-npm.cmd test                 # 运行前端检查
-npm.cmd run backend:local    # 启动 Windows 本地后端
-npm.cmd run articles:export  # 导出文章、Markdown 和封面
-npm.cmd run articles:import  # 导入文章和封面
+npm.cmd run dev              # 前端开发服务器
+npm.cmd run build            # 前端构建
+npm.cmd test                 # 前端测试
+npm.cmd run backend:local    # 本地启动 Java API
+npm.cmd run backend:package  # 打包 Java JAR
+npm.cmd run backend:test     # 后端测试
+npm.cmd run articles:export  # 导出文章目录
+npm.cmd run articles:import  # 导入文章目录
 ```
 
-当前后端已接入 Spring Security 鉴权。已发布文章可以公开读取，文章写入接口仅允许管理员账号调用。账号初始化和登录接口说明请查看 [`backend/AUTH.md`](backend/AUTH.md)。
+详细说明请查看 [`backend/README.md`](backend/README.md) 和 [`scripts/README.md`](scripts/README.md)。

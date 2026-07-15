@@ -1,0 +1,12 @@
+{
+  "id": "33333333-3333-3333-3333-333333333333",
+  "slug": "the-weather-of-a-day",
+  "title": "The weather of a day",
+  "summary": "A short record of light, rain, and the small changes between them.",
+  "tags": ["diary", "observations"],
+  "status": "PUBLISHED",
+  "publishedAt": "2026-07-10T12:00:00Z",
+  "createdAt": "2026-07-10T12:00:00Z",
+  "updatedAt": "2026-07-10T12:00:00Z",
+  "cover": "cover.svg"
+}

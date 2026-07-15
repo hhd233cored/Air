@@ -1,131 +1,94 @@
 param(
-    [string]$BaseUrl = "http://localhost:8080",
     [string]$InputDirectory = ".\article-export",
     [string]$PublicDirectory = ".\public",
-    [string]$Username = $env:AUTH_ADMIN_USERNAME,
-    [string]$Password = $env:AUTH_ADMIN_PASSWORD,
+    [string]$BaseUrl,
+    [string]$Username,
+    [string]$Password,
     [int]$TimeoutSec = 15,
     [switch]$Publish,
     [switch]$UpdateExisting
 )
 
 $ErrorActionPreference = "Stop"
-$apiRoot = "$($BaseUrl.TrimEnd('/'))/api/v1"
 $inputRoot = [System.IO.Path]::GetFullPath($InputDirectory)
 $publicRoot = [System.IO.Path]::GetFullPath($PublicDirectory)
 $manifestPath = Join-Path $inputRoot "manifest.json"
+$articlesRoot = Join-Path $publicRoot "articles"
 
 if (-not (Test-Path -LiteralPath $manifestPath)) {
     throw "manifest.json was not found in $inputRoot"
 }
 
 $manifest = Get-Content -LiteralPath $manifestPath -Raw -Encoding utf8 | ConvertFrom-Json
-if ($manifest.format -ne "your-space-articles-v1") {
+if ($manifest.format -notin @("your-space-articles-v1", "your-space-articles-v2")) {
     throw "Unsupported article export format: $($manifest.format)"
 }
 
-if ([string]::IsNullOrWhiteSpace($Username) -or [string]::IsNullOrWhiteSpace($Password)) {
-    throw "Admin credentials are required. Pass -Username/-Password or set AUTH_ADMIN_USERNAME/AUTH_ADMIN_PASSWORD."
-}
-
-$webSession = New-Object Microsoft.PowerShell.Commands.WebRequestSession
-$csrf = Invoke-RestMethod -Uri "$apiRoot/auth/csrf" -Method Get -TimeoutSec $TimeoutSec -WebSession $webSession
-if ([string]::IsNullOrWhiteSpace([string]$csrf.token)) {
-    throw "The API did not return a CSRF token."
-}
-$loginBody = @{ username = $Username; password = $Password } | ConvertTo-Json
-Invoke-RestMethod -Uri "$apiRoot/auth/login" -Method Post -TimeoutSec $TimeoutSec -WebSession $webSession -Headers @{ "X-XSRF-TOKEN" = [string]$csrf.token } -ContentType "application/json; charset=utf-8" -Body $loginBody | Out-Null
-
-function Invoke-ArticleApi {
-    param(
-        [string]$Uri,
-        [string]$Method = "Get",
-        [string]$Body,
-        [string]$ContentType
-    )
-
-    $requestArgs = @{
-        Uri = $Uri
-        Method = $Method
-        TimeoutSec = $TimeoutSec
-        WebSession = $webSession
-    }
-    if (-not [string]::IsNullOrWhiteSpace($Body)) { $requestArgs.Body = $Body }
-    if (-not [string]::IsNullOrWhiteSpace($ContentType)) { $requestArgs.ContentType = $ContentType }
-    if ($Method.ToUpperInvariant() -notin @("GET", "HEAD", "OPTIONS")) {
-        $requestArgs.Headers = @{ "X-XSRF-TOKEN" = [string]$csrf.token }
-    }
-    Invoke-RestMethod @requestArgs
-}
-
-$existingBySlug = @{}
-if ($UpdateExisting) {
-    $page = 0
-    do {
-        $response = Invoke-ArticleApi -Uri "$apiRoot/articles?page=$page&size=50"
-        foreach ($article in @($response.content)) {
-            $existingBySlug[$article.slug] = $article
-        }
-        $page += 1
-    } while ($page -lt [int]$response.totalPages)
-}
+New-Item -ItemType Directory -Path $articlesRoot -Force | Out-Null
+$indexArticles = @()
 
 foreach ($item in @($manifest.articles)) {
-    Write-Host "Processing $($item.slug)..."
+    $slug = ([string]$item.slug).Trim().ToLowerInvariant() -replace '[^a-z0-9-]', '-'
+    $slug = $slug.Trim('-')
+    if ([string]::IsNullOrWhiteSpace($slug)) { throw "Invalid article slug: $($item.slug)" }
+
+    $articleDirectory = Join-Path $articlesRoot $slug
+    New-Item -ItemType Directory -Path (Join-Path $articleDirectory "assets") -Force | Out-Null
+
     $contentPath = Join-Path $inputRoot ([string]$item.contentFile).Replace('/', '\')
     if (-not (Test-Path -LiteralPath $contentPath)) {
-        Write-Warning "Skipped $($item.slug): Markdown file not found at $contentPath"
+        Write-Warning "Skipped ${slug}: Markdown file not found at $contentPath"
         continue
     }
+    Copy-Item -LiteralPath $contentPath -Destination (Join-Path $articleDirectory "article.md") -Force
 
-    $coverUrl = [string]$item.coverUrl
+    $coverName = $null
     $coverFile = [string]$item.coverFile
     if (-not [string]::IsNullOrWhiteSpace($coverFile)) {
-        $exportedCoverPath = Join-Path $inputRoot $coverFile.Replace('/', '\')
-        if (Test-Path -LiteralPath $exportedCoverPath) {
-            $coverName = [System.IO.Path]::GetFileName($exportedCoverPath)
-            $coverExtension = [System.IO.Path]::GetExtension($coverName).ToLowerInvariant()
-            $supportedExtensions = @('.svg', '.png', '.jpg', '.jpeg', '.webp')
-            if ($supportedExtensions -notcontains $coverExtension) {
-                Write-Warning "Cover format is not one of SVG/PNG/JPG/JPEG/WebP for $($item.slug): $coverExtension"
+        $sourceCover = Join-Path $inputRoot $coverFile.Replace('/', '\')
+        if (Test-Path -LiteralPath $sourceCover) {
+            $coverName = [System.IO.Path]::GetFileName($sourceCover)
+            $extension = [System.IO.Path]::GetExtension($coverName).ToLowerInvariant()
+            if (@('.svg', '.png', '.jpg', '.jpeg', '.webp') -notcontains $extension) {
+                Write-Warning "Unsupported cover extension for ${slug}: $extension"
             }
-            $coverTargetUrl = if ($coverUrl.StartsWith('/')) { $coverUrl } else { "/article-covers/$coverName" }
-            $coverTargetPath = Join-Path $publicRoot $coverTargetUrl.TrimStart('/').Replace('/', '\')
-            New-Item -ItemType Directory -Path (Split-Path -Parent $coverTargetPath) -Force | Out-Null
-            $sourceFullPath = [System.IO.Path]::GetFullPath($exportedCoverPath)
-            $targetFullPath = [System.IO.Path]::GetFullPath($coverTargetPath)
-            if ($sourceFullPath -ne $targetFullPath) {
-                [System.IO.File]::Copy($sourceFullPath, $targetFullPath, $true)
-            }
-            $coverUrl = $coverTargetUrl
+            Copy-Item -LiteralPath $sourceCover -Destination (Join-Path $articleDirectory $coverName) -Force
         } else {
-            Write-Warning "Cover file not found for $($item.slug): $exportedCoverPath"
+            Write-Warning "Cover file not found for ${slug}: $sourceCover"
         }
     }
 
-    $payload = [ordered]@{
-        slug = $item.slug
-        title = $item.title
-        summary = $item.summary
-        coverUrl = if ([string]::IsNullOrWhiteSpace($coverUrl)) { $null } else { $coverUrl }
-        contentMarkdown = [System.IO.File]::ReadAllText($contentPath, [System.Text.Encoding]::UTF8)
+    $status = if ($Publish) { "PUBLISHED" } else { [string]$item.status }
+    if ([string]::IsNullOrWhiteSpace($status)) { $status = "PUBLISHED" }
+    $metadata = [ordered]@{
+        id = if ($item.id) { [string]$item.id } else { [guid]::NewGuid().ToString() }
+        slug = $slug
+        title = [string]$item.title
+        summary = if ($null -eq $item.summary) { $null } else { [string]$item.summary }
         tags = @($item.tags)
+        status = $status
+        publishedAt = [string]$item.publishedAt
+        createdAt = [string]$item.createdAt
+        updatedAt = [string]$item.updatedAt
+        cover = $coverName
     }
-    $json = $payload | ConvertTo-Json -Depth 8
-    $existing = if ($UpdateExisting) { $existingBySlug[$item.slug] } else { $null }
+    $metadata | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath (Join-Path $articleDirectory "article.json") -Encoding utf8
 
-    if ($existing) {
-        $result = Invoke-ArticleApi -Uri "$apiRoot/articles/$($existing.id)" -Method Put -ContentType "application/json; charset=utf-8" -Body $json
-        $action = "updated"
-    } else {
-        $result = Invoke-ArticleApi -Uri "$apiRoot/articles" -Method Post -ContentType "application/json; charset=utf-8" -Body $json
-        $action = "created"
+    $indexArticles += [ordered]@{
+        id = $metadata.id
+        slug = $slug
+        title = $metadata.title
+        summary = $metadata.summary
+        coverUrl = if ($coverName) { "/articles/$slug/$coverName" } else { $null }
+        tags = @($metadata.tags)
+        status = $status
+        publishedAt = $metadata.publishedAt
+        createdAt = $metadata.createdAt
+        updatedAt = $metadata.updatedAt
     }
-
-    if ($Publish -and $result.status -ne "PUBLISHED") {
-        $result = Invoke-ArticleApi -Uri "$apiRoot/articles/$($result.id)/publish" -Method Post
-        $action = "$action and published"
-    }
-
-    Write-Host "${action}: $($item.slug)"
+    Write-Host "Imported: $slug"
 }
+
+$indexArticles = @($indexArticles | Sort-Object { $_.publishedAt } -Descending)
+$indexArticles | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath (Join-Path $articlesRoot "index.json") -Encoding utf8
+Write-Host "Generated $($indexArticles.Count) article(s) in $articlesRoot"

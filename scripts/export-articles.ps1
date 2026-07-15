@@ -1,95 +1,67 @@
 param(
-    [string]$BaseUrl = "http://localhost:8080",
     [string]$OutputDirectory = ".\article-export",
     [string]$PublicDirectory = ".\public",
+    [string]$BaseUrl,
     [int]$PageSize = 50
 )
 
 $ErrorActionPreference = "Stop"
-$apiRoot = "$($BaseUrl.TrimEnd('/'))/api/v1"
 $outputRoot = [System.IO.Path]::GetFullPath($OutputDirectory)
-$articlesDirectory = Join-Path $outputRoot "articles"
-$coversDirectory = Join-Path $outputRoot "covers"
 $publicRoot = [System.IO.Path]::GetFullPath($PublicDirectory)
+$articlesRoot = Join-Path $publicRoot "articles"
+$outputArticlesRoot = Join-Path $outputRoot "articles"
 
-New-Item -ItemType Directory -Path $articlesDirectory -Force | Out-Null
-New-Item -ItemType Directory -Path $coversDirectory -Force | Out-Null
+if (-not (Test-Path -LiteralPath $articlesRoot)) {
+    throw "Article directory was not found: $articlesRoot"
+}
 
-$articles = @()
-$page = 0
-do {
-    $response = Invoke-RestMethod -Uri "$apiRoot/articles?page=$page&size=$PageSize" -Method Get
-    if ($response.content) {
-        $articles += @($response.content)
-    }
-    $page += 1
-} while ($page -lt [int]$response.totalPages)
-
+New-Item -ItemType Directory -Path $outputArticlesRoot -Force | Out-Null
 $manifestArticles = @()
-foreach ($article in $articles) {
-    $safeSlug = ($article.slug -replace '[^a-zA-Z0-9._-]', '-')
-    if ([string]::IsNullOrWhiteSpace($safeSlug)) { $safeSlug = "article-$($article.id)" }
 
-    $detail = Invoke-RestMethod -Uri "$apiRoot/articles/$([uri]::EscapeDataString($article.slug))" -Method Get
-    $contentFile = "articles/$safeSlug.md"
-    $contentPath = Join-Path $outputRoot $contentFile.Replace('/', '\')
-    [System.IO.File]::WriteAllText($contentPath, [string]$detail.contentMarkdown, [System.Text.UTF8Encoding]::new($false))
+foreach ($sourceDirectory in @(Get-ChildItem -LiteralPath $articlesRoot -Directory)) {
+    $metadataPath = Join-Path $sourceDirectory.FullName "article.json"
+    $contentPath = Join-Path $sourceDirectory.FullName "article.md"
+    if (-not (Test-Path -LiteralPath $metadataPath) -or -not (Test-Path -LiteralPath $contentPath)) {
+        Write-Warning "Skipped incomplete article directory: $($sourceDirectory.Name)"
+        continue
+    }
+
+    $metadata = Get-Content -LiteralPath $metadataPath -Raw -Encoding utf8 | ConvertFrom-Json
+    $slug = [string]$metadata.slug
+    $targetDirectory = Join-Path $outputArticlesRoot $slug
+    New-Item -ItemType Directory -Path (Join-Path $targetDirectory "assets") -Force | Out-Null
+    Copy-Item -LiteralPath $metadataPath -Destination (Join-Path $targetDirectory "article.json") -Force
+    Copy-Item -LiteralPath $contentPath -Destination (Join-Path $targetDirectory "article.md") -Force
 
     $coverFile = $null
-    if (-not [string]::IsNullOrWhiteSpace([string]$detail.coverUrl)) {
-        $coverUrl = [string]$detail.coverUrl
-        $coverPathPart = ($coverUrl -split '[?#]', 2)[0]
-        $extension = [System.IO.Path]::GetExtension($coverPathPart)
-        $supportedExtensions = @('.svg', '.png', '.jpg', '.jpeg', '.webp')
-        if ([string]::IsNullOrWhiteSpace($extension)) { $extension = ".img" }
-        $extension = $extension.ToLowerInvariant()
-        if ($supportedExtensions -notcontains $extension) {
-            Write-Warning "Cover format is not one of SVG/PNG/JPG/JPEG/WebP for $($detail.slug): $extension"
-        }
-        $coverFile = "covers/$safeSlug$extension"
-        $coverPath = Join-Path $outputRoot $coverFile.Replace('/', '\')
-
-        try {
-            if ($coverUrl.StartsWith('/')) {
-                $sourceCoverPath = Join-Path $publicRoot $coverUrl.TrimStart('/').Replace('/', '\')
-                if (-not (Test-Path -LiteralPath $sourceCoverPath)) { throw "Local cover not found: $sourceCoverPath" }
-                Copy-Item -LiteralPath $sourceCoverPath -Destination $coverPath -Force
-            } elseif ($coverUrl -match '^https?://') {
-                Invoke-WebRequest -Uri $coverUrl -OutFile $coverPath -UseBasicParsing
-            } else {
-                $sourceCoverPath = Join-Path $publicRoot $coverUrl.Replace('/', '\')
-                if (-not (Test-Path -LiteralPath $sourceCoverPath)) { throw "Local cover not found: $sourceCoverPath" }
-                Copy-Item -LiteralPath $sourceCoverPath -Destination $coverPath -Force
-            }
-        } catch {
-            Write-Warning "Cover export skipped for $($detail.slug): $($_.Exception.Message)"
-            $coverFile = $null
+    if (-not [string]::IsNullOrWhiteSpace([string]$metadata.cover)) {
+        $sourceCover = Join-Path $sourceDirectory.FullName ([string]$metadata.cover).Replace('/', '\')
+        if (Test-Path -LiteralPath $sourceCover) {
+            $coverFile = "articles/$slug/$([System.IO.Path]::GetFileName($sourceCover))"
+            Copy-Item -LiteralPath $sourceCover -Destination (Join-Path $targetDirectory ([System.IO.Path]::GetFileName($sourceCover))) -Force
         }
     }
 
     $manifestArticles += [ordered]@{
-        id = $detail.id
-        slug = $detail.slug
-        title = $detail.title
-        summary = $detail.summary
-        coverUrl = $detail.coverUrl
-        tags = @($detail.tags)
+        id = $metadata.id
+        slug = $slug
+        title = $metadata.title
+        summary = $metadata.summary
+        coverUrl = if ($coverFile) { "/articles/$slug/$([System.IO.Path]::GetFileName($coverFile))" } else { $null }
+        tags = @($metadata.tags)
         coverFile = $coverFile
-        status = $detail.status
-        publishedAt = $detail.publishedAt
-        createdAt = $detail.createdAt
-        updatedAt = $detail.updatedAt
-        contentFile = $contentFile
+        status = $metadata.status
+        publishedAt = $metadata.publishedAt
+        createdAt = $metadata.createdAt
+        updatedAt = $metadata.updatedAt
+        contentFile = "articles/$slug/article.md"
     }
 }
 
 $manifest = [ordered]@{
-    format = "your-space-articles-v1"
+    format = "your-space-articles-v2"
     exportedAt = [DateTime]::UtcNow.ToString("o")
-    source = $apiRoot
-    articles = $manifestArticles
+    articles = @($manifestArticles | Sort-Object { $_.publishedAt } -Descending)
 }
-$manifestPath = Join-Path $outputRoot "manifest.json"
-$manifest | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $manifestPath -Encoding utf8
-
-Write-Host "Exported $($articles.Count) published article(s) to $outputRoot"
+$manifest | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath (Join-Path $outputRoot "manifest.json") -Encoding utf8
+Write-Host "Exported $($manifestArticles.Count) article(s) to $outputRoot"

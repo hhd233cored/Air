@@ -1,7 +1,7 @@
 $ErrorActionPreference = "Stop"
 
 # Load the repository .env into this PowerShell process so local Spring Boot
-# startup can use the same database and authentication settings as Docker.
+# startup can use the same article directory and API settings as production.
 $environmentFile = Join-Path $PSScriptRoot "..\.env"
 if (Test-Path -LiteralPath $environmentFile) {
     Get-Content -LiteralPath $environmentFile -Encoding UTF8 | ForEach-Object {
@@ -42,6 +42,11 @@ if (-not $maven) {
 if (-not $maven) {
     Write-Error "Maven was not found. Install Maven 3.9+, add its bin directory to PATH, and run npm.cmd run backend:local again."
     exit 1
+}
+
+$projectRoot = Split-Path -Parent $PSScriptRoot
+if ($env:ARTICLE_CONTENT_DIR -and -not [System.IO.Path]::IsPathRooted($env:ARTICLE_CONTENT_DIR)) {
+    $env:ARTICLE_CONTENT_DIR = [System.IO.Path]::GetFullPath((Join-Path $projectRoot $env:ARTICLE_CONTENT_DIR))
 }
 
 Push-Location $PSScriptRoot

@@ -1,142 +1,132 @@
 package com.yourspace.article.service;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.yourspace.article.dto.ArticleResponse;
 import com.yourspace.article.dto.ArticleSummaryResponse;
-import com.yourspace.article.dto.CreateArticleRequest;
-import com.yourspace.article.dto.UpdateArticleRequest;
-import com.yourspace.article.entity.Article;
 import com.yourspace.article.entity.ArticleStatus;
-import com.yourspace.article.repository.ArticleRepository;
 import com.yourspace.common.PageResponse;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageRequest;
-import org.springframework.data.domain.Pageable;
-import org.springframework.data.domain.Sort;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.Locale;
 import java.util.Set;
-import java.util.UUID;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 @Service
-@Transactional
 public class ArticleService {
-    private final ArticleRepository repository;
+    private static final Logger log = LoggerFactory.getLogger(ArticleService.class);
+    private static final String METADATA_FILE = "article.json";
+    private static final String CONTENT_FILE = "article.md";
 
-    public ArticleService(ArticleRepository repository) {
-        this.repository = repository;
+    private final ObjectMapper objectMapper;
+    private final Path articlesRoot;
+
+    public ArticleService(ObjectMapper objectMapper, @Value("${app.articles.directory:./public/articles}") String articlesDirectory) {
+        this.objectMapper = objectMapper;
+        this.articlesRoot = Paths.get(articlesDirectory).toAbsolutePath().normalize();
     }
 
-    @Transactional(readOnly = true)
     public PageResponse<ArticleSummaryResponse> listPublished(int page, int size, String tag) {
-        Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "publishedAt"));
-        Page<Article> result = tag == null || tag.isBlank()
-                ? repository.findAllByStatus(ArticleStatus.PUBLISHED, pageable)
-                : repository.findAllByStatusAndTag(ArticleStatus.PUBLISHED, normalizeTag(tag), pageable);
-        return new PageResponse<>(result.map(this::toSummary).getContent(), result.getNumber(), result.getSize(), result.getTotalElements(), result.getTotalPages());
+        String normalizedTag = normalizeTag(tag);
+        List<ArticleMetadata> articles = readMetadata().stream()
+                .filter(article -> article.status() == ArticleStatus.PUBLISHED)
+                .filter(article -> normalizedTag == null || article.tags() != null && article.tags().stream().map(this::normalizeTag).anyMatch(normalizedTag::equals))
+                .sorted(Comparator.comparing(ArticleMetadata::publishedAt, Comparator.nullsLast(Comparator.reverseOrder()))
+                        .thenComparing(ArticleMetadata::createdAt, Comparator.nullsLast(Comparator.reverseOrder())))
+                .toList();
+
+        int from = Math.min(page * size, articles.size());
+        int to = Math.min(from + size, articles.size());
+        int totalPages = articles.isEmpty() ? 0 : (int) Math.ceil(articles.size() / (double) size);
+        List<ArticleSummaryResponse> content = articles.subList(from, to).stream()
+                .map(this::toSummary)
+                .toList();
+        return new PageResponse<>(content, page, size, articles.size(), totalPages);
     }
 
-    @Transactional(readOnly = true)
     public ArticleResponse getPublished(String slug) {
-        return repository.findBySlugAndStatus(normalizeSlug(slug), ArticleStatus.PUBLISHED)
-                .map(this::toResponse)
+        ArticleMetadata metadata = readMetadata().stream()
+                .filter(article -> article.status() == ArticleStatus.PUBLISHED)
+                .filter(article -> normalizeSlug(article.slug()).equals(normalizeSlug(slug)))
+                .findFirst()
                 .orElseThrow(() -> new ArticleNotFoundException(slug));
-    }
 
-    @Transactional(readOnly = true)
-    public PageResponse<ArticleSummaryResponse> listAdmin(int page, int size, ArticleStatus status) {
-        Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"));
-        Page<Article> result = status == null
-                ? repository.findAll(pageable)
-                : repository.findAllByStatus(status, pageable);
-        return new PageResponse<>(result.map(this::toSummary).getContent(), result.getNumber(), result.getSize(), result.getTotalElements(), result.getTotalPages());
-    }
-
-    @Transactional(readOnly = true)
-    public ArticleResponse getAdmin(UUID id) {
-        return toResponse(getById(id));
-    }
-
-    public ArticleResponse create(CreateArticleRequest request) {
-        String slug = request.slug() == null || request.slug().isBlank() ? slugify(request.title()) : normalizeSlug(request.slug());
-        ensureSlugAvailable(slug, null);
-        Article article = new Article(slug, request.title().trim(), clean(request.summary()), clean(request.coverUrl()), request.contentMarkdown(), normalizeTags(request.tags()));
-        return toResponse(repository.save(article));
-    }
-
-    public ArticleResponse update(UUID id, UpdateArticleRequest request) {
-        Article article = getById(id);
-        String slug = request.slug() == null || request.slug().isBlank() ? slugify(request.title()) : normalizeSlug(request.slug());
-        ensureSlugAvailable(slug, id);
-        article.setSlug(slug);
-        article.setTitle(request.title().trim());
-        article.setSummary(clean(request.summary()));
-        article.setCoverUrl(clean(request.coverUrl()));
-        article.setContentMarkdown(request.contentMarkdown());
-        article.setTags(normalizeTags(request.tags()));
-        return toResponse(repository.save(article));
-    }
-
-    public ArticleResponse publish(UUID id) {
-        Article article = getById(id);
-        article.setStatus(ArticleStatus.PUBLISHED);
-        article.setPublishedAt(article.getPublishedAt() == null ? Instant.now() : article.getPublishedAt());
-        return toResponse(repository.save(article));
-    }
-
-    public ArticleResponse archive(UUID id) {
-        Article article = getById(id);
-        article.setStatus(ArticleStatus.ARCHIVED);
-        return toResponse(repository.save(article));
-    }
-
-    public void delete(UUID id) {
-        Article article = getById(id);
-        repository.delete(article);
-    }
-
-    private Article getById(UUID id) {
-        return repository.findById(id).orElseThrow(() -> new ArticleNotFoundException(id));
-    }
-
-    private void ensureSlugAvailable(String slug, UUID id) {
-        boolean exists = id == null ? repository.existsBySlug(slug) : repository.existsBySlugAndIdNot(slug, id);
-        if (exists) throw new DuplicateSlugException(slug);
-    }
-
-    private ArticleSummaryResponse toSummary(Article article) {
-        return new ArticleSummaryResponse(article.getId(), article.getSlug(), article.getTitle(), article.getSummary(), article.getCoverUrl(), Set.copyOf(article.getTags()), article.getStatus(), article.getPublishedAt(), article.getCreatedAt(), article.getUpdatedAt());
-    }
-
-    private ArticleResponse toResponse(Article article) {
-        return new ArticleResponse(article.getId(), article.getSlug(), article.getTitle(), article.getSummary(), article.getCoverUrl(), article.getContentMarkdown(), Set.copyOf(article.getTags()), article.getStatus(), article.getPublishedAt(), article.getCreatedAt(), article.getUpdatedAt());
-    }
-
-    private static String clean(String value) {
-        return value == null || value.isBlank() ? null : value.trim();
-    }
-
-    private static Set<String> normalizeTags(Set<String> tags) {
-        Set<String> normalized = new LinkedHashSet<>();
-        if (tags != null) {
-            tags.stream().filter(tag -> tag != null && !tag.isBlank()).map(ArticleService::normalizeTag).forEach(normalized::add);
+        Path folder = folderFor(metadata);
+        Path contentPath = folder.resolve(CONTENT_FILE).normalize();
+        if (!contentPath.startsWith(folder) || !Files.isRegularFile(contentPath)) {
+            throw new ArticleNotFoundException(slug);
         }
-        return normalized;
+        try {
+            String markdown = Files.readString(contentPath, StandardCharsets.UTF_8);
+            return new ArticleResponse(metadata.id(), metadata.slug(), metadata.title(), metadata.summary(), coverUrl(metadata, folder), markdown, tags(metadata), metadata.status(), metadata.publishedAt(), metadata.createdAt(), metadata.updatedAt());
+        } catch (IOException exception) {
+            log.warn("Could not read article content for {}", slug, exception);
+            throw new ArticleNotFoundException(slug);
+        }
     }
 
-    private static String normalizeTag(String tag) {
-        return tag.trim().toLowerCase(Locale.ROOT);
+    private List<ArticleMetadata> readMetadata() {
+        if (!Files.isDirectory(articlesRoot)) return List.of();
+        List<ArticleMetadata> result = new ArrayList<>();
+        try (Stream<Path> folders = Files.list(articlesRoot)) {
+            folders.filter(Files::isDirectory).forEach(folder -> {
+                Path metadataPath = folder.resolve(METADATA_FILE);
+                if (!Files.isRegularFile(metadataPath)) return;
+                try {
+                    ArticleMetadata metadata = objectMapper.readValue(metadataPath.toFile(), ArticleMetadata.class);
+                    if (metadata.slug() == null || !normalizeSlug(metadata.slug()).equals(normalizeSlug(folder.getFileName().toString()))) {
+                        log.warn("Skipping article with mismatched folder and slug: {}", metadataPath);
+                        return;
+                    }
+                    result.add(metadata);
+                } catch (IOException | RuntimeException exception) {
+                    log.warn("Skipping invalid article metadata: {}", metadataPath, exception);
+                }
+            });
+        } catch (IOException exception) {
+            log.warn("Could not scan article directory {}", articlesRoot, exception);
+        }
+        return result;
     }
 
-    private static String normalizeSlug(String slug) {
-        return slug.trim().toLowerCase(Locale.ROOT);
+    private ArticleSummaryResponse toSummary(ArticleMetadata metadata) {
+        return new ArticleSummaryResponse(metadata.id(), metadata.slug(), metadata.title(), metadata.summary(), coverUrl(metadata, folderFor(metadata)), tags(metadata), metadata.status(), metadata.publishedAt(), metadata.createdAt(), metadata.updatedAt());
     }
 
-    private static String slugify(String title) {
-        String slug = title.toLowerCase(Locale.ROOT).trim().replaceAll("[^a-z0-9]+", "-").replaceAll("^-|-$", "");
-        return slug.isBlank() ? "article-" + UUID.randomUUID().toString().substring(0, 8) : slug;
+    private Path folderFor(ArticleMetadata metadata) {
+        return articlesRoot.resolve(normalizeSlug(metadata.slug())).normalize();
+    }
+
+    private String coverUrl(ArticleMetadata metadata, Path folder) {
+        if (metadata.cover() == null || metadata.cover().isBlank()) return null;
+        Path coverPath = folder.resolve(metadata.cover()).normalize();
+        if (!coverPath.startsWith(folder) || !Files.isRegularFile(coverPath)) return null;
+        return "/articles/" + normalizeSlug(metadata.slug()) + "/" + metadata.cover().replace('\\', '/');
+    }
+
+    private Set<String> tags(ArticleMetadata metadata) {
+        if (metadata.tags() == null) return Set.of();
+        return metadata.tags().stream().filter(tag -> tag != null && !tag.isBlank()).map(this::normalizeTag).collect(Collectors.toCollection(LinkedHashSet::new));
+    }
+
+    private String normalizeSlug(String slug) {
+        return slug == null ? "" : slug.trim().toLowerCase(Locale.ROOT);
+    }
+
+    private String normalizeTag(String tag) {
+        return tag == null || tag.isBlank() ? null : tag.trim().toLowerCase(Locale.ROOT);
     }
 }

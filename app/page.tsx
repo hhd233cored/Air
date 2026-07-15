@@ -2,8 +2,7 @@
 
 import { type ReactNode, useEffect, useRef, useState } from "react";
 import { apiGet } from "./lib/api/client";
-import { type AuthUser, getCurrentUser, login, logout } from "./lib/api/auth";
-import { type ArticleSummary, getAllPublishedArticles, getPublishedArticle, getPublishedArticles } from "./lib/api/articles";
+import { type ArticleSummary, getAllPublishedArticles, getLocalArticleIndex, getPublishedArticle, getPublishedArticles } from "./lib/api/articles";
 
 type PageKey = "home" | "projects" | "about" | "article";
 
@@ -26,7 +25,7 @@ const fallbackArticleList: ArticleSummary[] = [
     slug: "first-note",
     title: "First note",
     summary: "The first sample article served by the Java API.",
-    coverUrl: "/article-covers/first-note.svg",
+    coverUrl: "/articles/first-note/cover.svg",
     tags: ["notes"],
     status: "PUBLISHED",
     publishedAt: "2026-07-14T12:00:00Z",
@@ -323,71 +322,6 @@ function PageButton({ active, index, label, onClick }: { active: boolean; index:
   );
 }
 
-function AuthControls() {
-  const [user, setUser] = useState<AuthUser | null>(null);
-  const [ready, setReady] = useState(false);
-  const [open, setOpen] = useState(false);
-  const [username, setUsername] = useState("");
-  const [password, setPassword] = useState("");
-  const [error, setError] = useState("");
-  const [busy, setBusy] = useState(false);
-
-  useEffect(() => {
-    getCurrentUser()
-      .then(setUser)
-      .catch(() => setUser(null))
-      .finally(() => setReady(true));
-  }, []);
-
-  const submit = async (event: React.FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    setBusy(true);
-    setError("");
-    try {
-      setUser(await login(username, password));
-      setPassword("");
-      setOpen(false);
-    } catch (requestError) {
-      setError(requestError instanceof Error ? requestError.message : "登录失败");
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const signOut = async () => {
-    setBusy(true);
-    try {
-      await logout();
-    } finally {
-      setUser(null);
-      setBusy(false);
-    }
-  };
-
-  return (
-    <div className="header-status">
-      <span className="header-status__presence"><span className="status-dot" /> Online-ish</span>
-      {!ready ? null : user ? (
-        <div className="auth-logged-in">
-          <span className="auth-user-label">{user.username} · {user.role === "ADMIN" ? "管理员" : "普通用户"}</span>
-          <button className="auth-action-button" type="button" onClick={signOut} disabled={busy}>退出</button>
-        </div>
-      ) : (
-        <button className="auth-action-button" type="button" onClick={() => { setOpen((visible) => !visible); setError(""); }} aria-expanded={open}>登录</button>
-      )}
-      {open && !user ? (
-        <form className="auth-login-panel" onSubmit={submit}>
-          <strong>登录</strong>
-          <label>账号<input autoComplete="username" value={username} onChange={(event) => setUsername(event.target.value)} required /></label>
-          <label>密码<input autoComplete="current-password" type="password" value={password} onChange={(event) => setPassword(event.target.value)} required /></label>
-          {error ? <p role="alert">{error}</p> : null}
-          <button type="submit" disabled={busy}>{busy ? "登录中…" : "确认登录"}</button>
-        </form>
-      ) : null}
-    </div>
-  );
-}
-
 function useCurrentTime() {
   const [now, setNow] = useState<Date | null>(null);
 
@@ -614,7 +548,13 @@ function HomePage({ onPageChange, onOpenArticle, now }: { onPageChange: (page: P
         if (!cancelled) setLatestArticles(result.content);
       })
       .catch(() => {
-        // Keep the local sample posts when the Java API is not running.
+        getLocalArticleIndex()
+          .then((result) => {
+            if (!cancelled) setLatestArticles(result.slice(0, 3));
+          })
+          .catch(() => {
+            // Keep the bundled sample post when the Java API and local index are unavailable.
+          });
       });
 
     return () => { cancelled = true; };
@@ -862,8 +802,19 @@ function ArticleListPage({ onOpenArticle }: { onOpenArticle: (slug: string) => v
       })
       .catch(() => {
         if (!cancelled) {
-          setArticles(fallbackArticleList);
-          setStatus("fallback");
+          getLocalArticleIndex()
+            .then((result) => {
+              if (!cancelled) {
+                setArticles(result);
+                setStatus("fallback");
+              }
+            })
+            .catch(() => {
+              if (!cancelled) {
+                setArticles(fallbackArticleList);
+                setStatus("fallback");
+              }
+            });
         }
       });
 
@@ -879,8 +830,7 @@ function ArticleListPage({ onOpenArticle }: { onOpenArticle: (slug: string) => v
         const article = await getPublishedArticle(slug);
         markdown = article.contentMarkdown;
       } catch {
-        if (slug !== "first-note") throw new Error("preview request failed");
-        const response = await fetch("/articles/first-note.md");
+        const response = await fetch(`/articles/${encodeURIComponent(slug)}/article.md`);
         if (!response.ok) throw new Error("preview fallback request failed");
         markdown = await response.text();
       }
@@ -982,19 +932,17 @@ function ArticleDetailPage({ slug, onBack }: { slug: string; onBack: () => void 
         // Fall back to the bundled Markdown demo while the Java API is offline.
       }
 
-      if (slug !== "first-note") {
-        if (!cancelled) setStatus("error");
-        return;
-      }
-
       try {
-        const response = await fetch("/articles/first-note.md");
+        const response = await fetch(`/articles/${encodeURIComponent(slug)}/article.md`);
         if (!response.ok) throw new Error("article request failed");
         const markdown = await response.text();
+        const localArticles = await getLocalArticleIndex();
+        const localArticle = localArticles.find((article) => article.slug === slug);
+        if (!localArticle) throw new Error("local article metadata not found");
         if (!cancelled) {
           setSource(markdown);
-          setArticleTitle("First note");
-          setCoverUrl("/article-covers/first-note.svg");
+          setArticleTitle(localArticle.title);
+          setCoverUrl(localArticle.coverUrl);
           setStatus("ready");
         }
       } catch {
@@ -1053,7 +1001,7 @@ export default function Home() {
         <nav className="page-nav" aria-label="页面切换">
           {navigation.map((item) => <PageButton key={item.id} active={activePage === item.id} index={item.index} label={item.label} onClick={() => { setActivePage(item.id); setSelectedArticleSlug(null); }} />)}
         </nav>
-        <AuthControls />
+        <div className="header-status"><span className="header-status__presence"><span className="status-dot" /> Online-ish</span></div>
         </div>
       </header>
 

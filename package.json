@@ -11,16 +11,14 @@
     "start": "vinext start",
     "test": "npm run build && node --test tests/rendered-html.test.mjs",
     "lint": "eslint . --ignore-pattern dist --ignore-pattern .next",
-    "db:generate": "drizzle-kit generate",
-    "backend:up": "docker compose up --build",
-    "backend:down": "docker compose down",
     "backend:local": "powershell -ExecutionPolicy Bypass -File backend/run-local.ps1",
+    "backend:package": "mvn -f backend/pom.xml -DskipTests package",
+    "backend:prod": "powershell -ExecutionPolicy Bypass -File backend/run-prod.ps1",
     "backend:test": "mvn -f backend/pom.xml test",
     "articles:export": "powershell -ExecutionPolicy Bypass -File scripts/export-articles.ps1",
     "articles:import": "powershell -ExecutionPolicy Bypass -File scripts/import-articles.ps1"
   },
   "dependencies": {
-    "drizzle-orm": "0.45.2",
     "next": "16.2.6",
     "react": "19.2.6",
     "react-dom": "19.2.6"
@@ -33,7 +31,6 @@
     "@types/react-dom": "19.2.3",
     "@vitejs/plugin-react": "6.0.2",
     "@vitejs/plugin-rsc": "0.5.26",
-    "drizzle-kit": "0.31.10",
     "eslint": "9.39.4",
     "eslint-config-next": "16.2.6",
     "react-server-dom-webpack": "19.2.6",

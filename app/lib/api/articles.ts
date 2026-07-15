@@ -48,3 +48,9 @@ export async function getAllPublishedArticles(pageSize = 50) {
 
   return articles;
 }
+
+export async function getLocalArticleIndex() {
+  const response = await fetch("/articles/index.json", { headers: { Accept: "application/json" } });
+  if (!response.ok) throw new Error(`Local article index request failed with status ${response.status}`);
+  return response.json() as Promise<ArticleSummary[]>;
+}

@@ -11,38 +11,17 @@ export class ApiRequestError extends Error {
 }
 
 const apiBaseUrl = (process.env.NEXT_PUBLIC_API_BASE_URL ?? "").replace(/\/$/, "");
-let csrfToken: string | null = null;
-
-async function getCsrfToken() {
-  if (!apiBaseUrl) throw new ApiRequestError("Java API base URL is not configured");
-  const response = await fetch(`${apiBaseUrl}/api/v1/auth/csrf`, {
-    credentials: "include",
-    headers: { Accept: "application/json" },
-  });
-  if (!response.ok) throw new ApiRequestError(`CSRF request failed with status ${response.status}`, response.status);
-  const payload = await response.json() as { token?: string };
-  if (!payload.token) throw new ApiRequestError("CSRF token is missing");
-  csrfToken = payload.token;
-  return csrfToken;
-}
 
 export async function apiRequest<T>(path: string, init: RequestInit = {}): Promise<T> {
   if (!apiBaseUrl) throw new ApiRequestError("Java API base URL is not configured");
 
-  const method = (init.method ?? "GET").toUpperCase();
   const headers = new Headers(init.headers);
   headers.set("Accept", "application/json");
   if (init.body && !headers.has("Content-Type")) headers.set("Content-Type", "application/json");
 
-  if (!["GET", "HEAD", "OPTIONS"].includes(method)) {
-    headers.set("X-XSRF-TOKEN", csrfToken ?? await getCsrfToken());
-  }
-
   const response = await fetch(`${apiBaseUrl}/api/v1${path}`, {
     ...init,
-    method,
     headers,
-    credentials: "include",
   });
 
   if (!response.ok) {
@@ -54,9 +33,6 @@ export async function apiRequest<T>(path: string, init: RequestInit = {}): Promi
       message = error.message ?? message;
     } catch {
       // Keep the status-based message for non-JSON error responses.
-    }
-    if (response.status === 403 && code === "CSRF_INVALID") {
-      csrfToken = null;
     }
     throw new ApiRequestError(message, response.status, code);
   }

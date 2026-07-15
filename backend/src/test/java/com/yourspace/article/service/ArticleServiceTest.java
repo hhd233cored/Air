@@ -1,61 +1,69 @@
 package com.yourspace.article.service;
 
-import com.yourspace.article.dto.CreateArticleRequest;
-import com.yourspace.article.entity.Article;
-import com.yourspace.article.entity.ArticleStatus;
-import com.yourspace.article.repository.ArticleRepository;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
-import org.mockito.Mock;
-import org.mockito.junit.jupiter.MockitoExtension;
+import org.junit.jupiter.api.io.TempDir;
 
-import java.util.Set;
-import java.util.UUID;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
-@ExtendWith(MockitoExtension.class)
 class ArticleServiceTest {
-    @Mock
-    private ArticleRepository repository;
-
-    @InjectMocks
-    private ArticleService service;
+    @TempDir
+    Path articlesRoot;
 
     @Test
-    void createsDraftWithNormalizedSlugAndTags() {
-        when(repository.existsBySlug("quiet-corner")).thenReturn(false);
-        when(repository.save(any(Article.class))).thenAnswer(invocation -> invocation.getArgument(0));
+    void listsPublishedArticlesByPublishedDateAndReadsMarkdown() throws Exception {
+        writeArticle("older", "Older", "2026-07-10T12:00:00Z", "# Older\n\nOlder body", "cover.svg");
+        writeArticle("newer", "Newer", "2026-07-14T12:00:00Z", "# Newer\n\nNewer body", null);
+        writeArticle("draft", "Draft", "2026-07-15T12:00:00Z", "# Draft", null, "DRAFT");
 
-        var response = service.create(new CreateArticleRequest(
-                "Quiet-Corner",
-                "Quiet Corner",
-                "A short note",
-                null,
-                "# Hello",
-                Set.of("Design", "Notes")
-        ));
+        ArticleService service = new ArticleService(new ObjectMapper().findAndRegisterModules(), articlesRoot.toString());
 
-        assertThat(response.slug()).isEqualTo("quiet-corner");
-        assertThat(response.status()).isEqualTo(ArticleStatus.DRAFT);
-        assertThat(response.tags()).containsExactlyInAnyOrder("design", "notes");
-        verify(repository).save(any(Article.class));
+        var page = service.listPublished(0, 10, null);
+        assertEquals(2, page.totalElements());
+        assertEquals("newer", page.content().get(0).slug());
+        assertEquals("/articles/older/cover.svg", page.content().get(1).coverUrl());
+        assertEquals("# Newer\n\nNewer body", service.getPublished("newer").contentMarkdown());
     }
 
     @Test
-    void publishesAnExistingDraft() {
-        UUID id = UUID.randomUUID();
-        Article article = new Article("draft-note", "Draft note", null, null, "# Draft", Set.of());
-        when(repository.findById(id)).thenReturn(java.util.Optional.of(article));
-        when(repository.save(any(Article.class))).thenAnswer(invocation -> invocation.getArgument(0));
+    void filtersPublishedArticlesByTagAndRejectsUnknownSlug() throws Exception {
+        writeArticle("design-note", "Design note", "2026-07-14T12:00:00Z", "# Design", null, "PUBLISHED", "Design");
+        writeArticle("daily-note", "Daily note", "2026-07-13T12:00:00Z", "# Daily", null, "PUBLISHED", "diary");
 
-        var response = service.publish(id);
+        ArticleService service = new ArticleService(new ObjectMapper().findAndRegisterModules(), articlesRoot.toString());
 
-        assertThat(response.status()).isEqualTo(ArticleStatus.PUBLISHED);
-        assertThat(response.publishedAt()).isNotNull();
+        assertEquals(1, service.listPublished(0, 10, "design").totalElements());
+        assertThrows(ArticleNotFoundException.class, () -> service.getPublished("missing"));
+    }
+
+    private void writeArticle(String slug, String title, String publishedAt, String markdown, String cover) throws Exception {
+        writeArticle(slug, title, publishedAt, markdown, cover, "PUBLISHED", "notes");
+    }
+
+    private void writeArticle(String slug, String title, String publishedAt, String markdown, String cover, String status, String... tags) throws Exception {
+        Path folder = Files.createDirectories(articlesRoot.resolve(slug));
+        String coverJson = cover == null ? "null" : "\"" + cover + "\"";
+        String metadata = """
+                {
+                  "id": "00000000-0000-0000-0000-%012d",
+                  "slug": "%s",
+                  "title": "%s",
+                  "summary": "%s",
+                  "tags": ["%s"],
+                  "status": "%s",
+                  "publishedAt": "%s",
+                  "createdAt": "%s",
+                  "updatedAt": "%s",
+                  "cover": %s
+                }
+                """.formatted(Math.abs(slug.hashCode()), slug, title, title, String.join("\",\"", tags), status, publishedAt, publishedAt, publishedAt, coverJson);
+        Files.writeString(folder.resolve("article.json"), metadata, StandardCharsets.UTF_8);
+        Files.writeString(folder.resolve("article.md"), markdown, StandardCharsets.UTF_8);
+        if (cover != null) Files.writeString(folder.resolve(cover), "cover", StandardCharsets.UTF_8);
     }
 }
