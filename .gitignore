@@ -43,3 +43,6 @@ next-env.d.ts
 /work/
 /backend/target/
 /backend/data/
+/backend-python/.venv/
+/backend-python/**/__pycache__/
+.pytest_cache/
