@@ -6,6 +6,7 @@ import { type ArticleSummary, getAllPublishedArticles, getLocalArticleDetail, ge
 import { getChatterEntries, getLocalChatterIndex, type ChatterSummary } from "./lib/api/chatter";
 import { type HistoricalTodayEvent, getHistoricalToday } from "./lib/api/historical";
 import { getMusicPlaylist, getMusicTrackUrl, type MusicTrackSummary } from "./lib/api/music";
+import { MaintenancePage } from "./components/MaintenancePage";
 
 type PageKey = "home" | "projects" | "about" | "article" | "chatter";
 
@@ -1349,7 +1350,7 @@ function ArticleDetailPage({ slug, onBack }: { slug: string; onBack: () => void 
   );
 }
 
-export default function Home() {
+function SiteApp() {
   const [activePage, setActivePage] = useState<PageKey>("home");
   const [selectedArticleSlug, setSelectedArticleSlug] = useState<string | null>(null);
   const now = useCurrentTime();
@@ -1403,4 +1404,9 @@ export default function Home() {
       </div>
     </main>
   );
+}
+
+export default function Home() {
+  const maintenanceMode = process.env.NEXT_PUBLIC_MAINTENANCE_MODE !== "false";
+  return maintenanceMode ? <MaintenancePage /> : <SiteApp />;
 }
