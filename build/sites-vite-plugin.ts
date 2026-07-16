@@ -28,6 +28,8 @@ export function sites(): Plugin {
       const outputDirectory = resolve(root, "dist", ".openai");
       const hostingConfig = resolve(root, ".openai", "hosting.json");
       const drizzleSource = resolve(root, "drizzle");
+      const pictureSource = resolve(root, "picture");
+      const pictureOutput = resolve(root, "dist", "client", "picture");
 
       await rm(outputDirectory, { recursive: true, force: true });
       await mkdir(outputDirectory, { recursive: true });
@@ -39,6 +41,10 @@ export function sites(): Plugin {
         await cp(drizzleSource, resolve(outputDirectory, "drizzle"), {
           recursive: true,
         });
+      }
+      if (await exists(pictureSource)) {
+        await rm(pictureOutput, { recursive: true, force: true });
+        await cp(pictureSource, pictureOutput, { recursive: true });
       }
     },
   };

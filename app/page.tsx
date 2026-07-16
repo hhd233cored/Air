@@ -3,17 +3,21 @@
 import { type ReactNode, useCallback, useEffect, useRef, useState } from "react";
 import { resolveApiUrl } from "./lib/api/client";
 import { type ArticleSummary, getAllPublishedArticles, getLocalArticleDetail, getLocalArticleIndex, getPublishedArticle, getPublishedArticles, isAbortError } from "./lib/api/articles";
+import { getChatterEntries, getLocalChatterIndex, type ChatterSummary } from "./lib/api/chatter";
 import { type HistoricalTodayEvent, getHistoricalToday } from "./lib/api/historical";
 import { getMusicPlaylist, getMusicTrackUrl, type MusicTrackSummary } from "./lib/api/music";
 
-type PageKey = "home" | "projects" | "about" | "article";
+type PageKey = "home" | "projects" | "about" | "article" | "chatter";
 
 const navigation: { id: PageKey; label: string; index: string }[] = [
   { id: "home", label: "Home", index: "01" },
   { id: "projects", label: "Projects", index: "02" },
   { id: "about", label: "About", index: "03" },
   { id: "article", label: "Article", index: "04" },
+  { id: "chatter", label: "Dairy", index: "05" },
 ];
+
+const coverImages = ["1.png", "2.jpg", "3.png","4.png"].sort((left, right) => Number.parseInt(left, 10) - Number.parseInt(right, 10));
 
 const projects = [
   { title: "Luma Notes", type: "Product / 2026", description: "A quiet place for ideas, fragments, and the things worth keeping.", color: "lilac" },
@@ -356,6 +360,73 @@ function PageButton({ active, index, label, onClick }: { active: boolean; index:
   );
 }
 
+function CoverCarousel() {
+  const [trackIndex, setTrackIndex] = useState(0);
+  const [animateTrack, setAnimateTrack] = useState(true);
+  const activeIndex = trackIndex % coverImages.length;
+
+  useEffect(() => {
+    if (coverImages.length <= 1) return;
+    const timer = window.setInterval(() => {
+      setTrackIndex((index) => (index >= coverImages.length ? 0 : index + 1));
+    }, 5000);
+    return () => window.clearInterval(timer);
+  }, [trackIndex]);
+
+  useEffect(() => {
+    const recoverCarousel = () => {
+      if (document.visibilityState !== "visible") return;
+      setTrackIndex((index) => index >= coverImages.length ? index % coverImages.length : index);
+    };
+    document.addEventListener("visibilitychange", recoverCarousel);
+    window.addEventListener("pageshow", recoverCarousel);
+    return () => {
+      document.removeEventListener("visibilitychange", recoverCarousel);
+      window.removeEventListener("pageshow", recoverCarousel);
+    };
+  }, []);
+
+  const handleTrackTransitionEnd = (event: React.TransitionEvent<HTMLDivElement>) => {
+    if (event.propertyName !== "transform" || trackIndex !== coverImages.length) return;
+    setAnimateTrack(false);
+    setTrackIndex(0);
+    window.requestAnimationFrame(() => {
+      window.requestAnimationFrame(() => setAnimateTrack(true));
+    });
+  };
+
+  return (
+    <div className="cover-space" aria-label="顶部封面图片轮播">
+      <div className="cover-space__inner">
+        <div
+          className={`cover-space__track ${animateTrack ? "" : "is-resetting"}`}
+          style={{ "--cover-slide-index": trackIndex } as React.CSSProperties}
+          onTransitionEnd={handleTrackTransitionEnd}
+        >
+          {[...coverImages, coverImages[0]].map((image, index) => (
+            <img className="cover-space__image" src={`/picture/Cover/${image}`} alt={`顶部封面 ${index + 1}`} key={`${image}-${index}`} />
+          ))}
+        </div>
+        {coverImages.length > 1 ? (
+          <div className="cover-space__dots" aria-label="选择顶部封面">
+            {coverImages.map((image, index) => (
+              <button
+                className={`cover-space__dot ${index === activeIndex ? "is-active" : ""}`}
+                type="button"
+                key={image}
+                aria-label={`切换到第 ${index + 1} 张封面`}
+                aria-current={index === activeIndex ? "true" : undefined}
+                disabled={index === activeIndex}
+                onClick={() => { setAnimateTrack(true); setTrackIndex(index); }}
+              />
+            ))}
+          </div>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
 function useCurrentTime() {
   const [now, setNow] = useState<Date | null>(null);
 
@@ -448,6 +519,9 @@ function formatMusicTime(seconds: number) {
 }
 
 function MusicPlayerBar({ compact = false }: { compact?: boolean }) {
+  const volumeControlRef = useRef<HTMLDivElement | null>(null);
+  const playlistControlRef = useRef<HTMLDivElement | null>(null);
+  const playlistPopoverRef = useRef<HTMLDivElement | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const [trackIndex, setTrackIndex] = useState(0);
   const [musicTracks, setMusicTracks] = useState<MusicTrack[]>([]);
@@ -529,6 +603,31 @@ function MusicPlayerBar({ compact = false }: { compact?: boolean }) {
     if (audioRef.current) audioRef.current.volume = volume;
   }, [volume]);
 
+  useEffect(() => {
+    if (!showVolume && !showPlaylist) return;
+
+    const handleOutsidePointerDown = (event: PointerEvent) => {
+      if (!(event.target instanceof Node)) return;
+      const insideVolume = volumeControlRef.current?.contains(event.target) ?? false;
+      const insidePlaylist = (playlistControlRef.current?.contains(event.target) ?? false) || (playlistPopoverRef.current?.contains(event.target) ?? false);
+      if (!insideVolume) setShowVolume(false);
+      if (!insidePlaylist) setShowPlaylist(false);
+    };
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setShowVolume(false);
+        setShowPlaylist(false);
+      }
+    };
+
+    document.addEventListener("pointerdown", handleOutsidePointerDown);
+    document.addEventListener("keydown", handleEscape);
+    return () => {
+      document.removeEventListener("pointerdown", handleOutsidePointerDown);
+      document.removeEventListener("keydown", handleEscape);
+    };
+  }, [showPlaylist, showVolume]);
+
   const changeTrack = (offset: number) => {
     if (!musicTracks.length) return;
     setTrackIndex((index) => (index + offset + musicTracks.length) % musicTracks.length);
@@ -576,7 +675,7 @@ function MusicPlayerBar({ compact = false }: { compact?: boolean }) {
   const progressPercent = duration > 0 ? Math.min(100, Math.max(0, (currentTime / duration) * 100)) : 0;
 
   return (
-    <div className={`music-player-block ${compact ? "music-player-block--compact" : ""}`}>
+    <div className={`music-player-block ${compact ? "music-player-block--compact" : ""} ${showPlaylist ? "is-playlist-open" : ""}`}>
       <article className="music-player-bar">
         <div className="music-bar__track-info">
           <div className={`music-bar__cover ${isPlaying ? "is-playing" : ""}`} style={track.cover ? { backgroundImage: `url(${track.cover})` } : undefined} />
@@ -584,11 +683,37 @@ function MusicPlayerBar({ compact = false }: { compact?: boolean }) {
         </div>
         <div className="music-bar__center">
           <div className="music-bar__transport">
-            <button type="button" aria-label="随机播放">⤨</button>
+            <div ref={volumeControlRef} className="music-volume-control">
+              <button type="button" aria-label="显示音量" aria-expanded={showVolume} onClick={() => { setShowVolume((visible) => !visible); setShowPlaylist(false); }}><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M4 10v4h4l5 4V6l-5 4H4Zm12.5-1.5a5 5 0 0 1 0 7M18.5 6a9 9 0 0 1 0 12" /></svg></button>
+              {showVolume ? <div className="music-popover music-volume-popover"><input aria-label="音量" type="range" min="0" max="1" step="0.01" value={volume} style={{ "--volume-progress": `${volume * 100}%` } as React.CSSProperties} onChange={(event) => setVolume(Number(event.target.value))} /></div> : null}
+            </div>
             <button type="button" aria-label="上一首" onClick={() => changeTrack(-1)} disabled={!musicTracks.length}>◀</button>
             <button className="music-bar__play" type="button" aria-label={loadingTrackUrl || !track.src ? "加载播放地址" : isPlaying ? "暂停" : "播放"} onClick={togglePlayback} disabled={!track.id || !track.canPlay || !track.src || loadingTrackUrl}>{loadingTrackUrl || !track.src ? "…" : isPlaying ? "Ⅱ" : "▶"}</button>
             <button type="button" aria-label="下一首" onClick={() => changeTrack(1)} disabled={!musicTracks.length}>▶</button>
-            <button type="button" aria-label="显示歌单" aria-expanded={showPlaylist} onClick={() => { setShowPlaylist((visible) => !visible); setShowVolume(false); }}>☷</button>
+            <div ref={playlistControlRef} className="music-playlist-control">
+              <button type="button" aria-label="显示歌单" aria-expanded={showPlaylist} onClick={() => { setShowPlaylist((visible) => !visible); setShowVolume(false); }}><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M5 7h14M5 12h14M5 17h14" /></svg></button>
+              {showPlaylist ? (
+                <div ref={playlistPopoverRef} className="music-popover music-playlist-popover">
+                  <div><strong>{playlistSource === "local" ? "本地歌单" : "网易云歌单"}</strong>{playlistSource === "netease" ? <small>ID {netEasePlaylist.id}</small> : null}</div>
+                  {playlistSource === "netease" ? <a href={netEasePlaylist.url} target="_blank" rel="noreferrer">打开歌单 ↗</a> : null}
+                  {playlistStatus === "loading" ? <p>正在读取歌单…</p> : null}
+                  {playlistStatus === "error" ? <p>{playlistMessage ?? "歌单暂时无法读取，请检查后端音乐配置。"}</p> : null}
+                  {playlistStatus === "ready" ? (
+                    <div className="music-playlist-popover__tracks">
+                      {musicTracks.map((item, index) => (
+                        <button className={`music-playlist-popover__track ${item.canPlay ? "" : "is-unavailable"}`} type="button" key={item.id || `${item.title}-${index}`} onClick={() => { setTrackIndex(index); setShowPlaylist(false); }}>
+                          <span className="music-playlist-popover__track-number">{index + 1}</span>
+                          <span className="music-playlist-popover__track-info">
+                            <span className="music-playlist-popover__track-title">{item.title || "未命名歌曲"}</span>
+                            <span className="music-playlist-popover__track-artist">{item.artist || "未知作者"}{item.canPlay ? "" : " · 暂不可播放"}</span>
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+                  ) : null}
+                </div>
+              ) : null}
+            </div>
           </div>
           {duration > 0 ? (
             <div className="music-bar-progress">
@@ -598,30 +723,10 @@ function MusicPlayerBar({ compact = false }: { compact?: boolean }) {
           <div className="music-bar__time"><span>{formatMusicTime(currentTime)}</span><span>{formatMusicTime(duration)}</span></div>
         </div>
         <div className="music-bar__actions">
-          <button type="button" aria-label="显示音量" aria-expanded={showVolume} onClick={() => { setShowVolume((visible) => !visible); setShowPlaylist(false); }}>◖</button>
           {playlistSource === "netease" ? <button type="button" aria-label="打开网易云歌单" onClick={() => window.open(netEasePlaylist.url, "_blank", "noopener,noreferrer")}>↗</button> : null}
         </div>
         <audio ref={audioRef} src={track.src || undefined} preload="metadata" onPlay={() => setIsPlaying(true)} onPause={() => setIsPlaying(false)} onEnded={() => { setIsPlaying(false); setCurrentTime(0); if (audioRef.current) audioRef.current.currentTime = 0; }} onLoadedMetadata={(event) => setDuration(event.currentTarget.duration)} onTimeUpdate={(event) => setCurrentTime(event.currentTarget.currentTime)} />
       </article>
-      {showVolume ? <div className="music-popover music-volume-popover"><span>音量</span><input aria-label="音量" type="range" min="0" max="1" step="0.01" value={volume} onChange={(event) => setVolume(Number(event.target.value))} /></div> : null}
-      {showPlaylist ? (
-        <div className="music-popover music-playlist-popover">
-          <div><strong>{playlistSource === "local" ? "本地歌单" : "网易云歌单"}</strong><small>{playlistSource === "local" ? "music/playlist.json" : `ID ${netEasePlaylist.id}`}</small></div>
-          {playlistSource === "netease" ? <a href={netEasePlaylist.url} target="_blank" rel="noreferrer">打开歌单 ↗</a> : null}
-          {playlistStatus === "loading" ? <p>正在读取歌单…</p> : null}
-          {playlistStatus === "error" ? <p>{playlistMessage ?? "歌单暂时无法读取，请检查后端音乐配置。"}</p> : null}
-          {playlistStatus === "ready" ? (
-            <div className="music-playlist-popover__tracks">
-              {musicTracks.map((item, index) => (
-                <button className={`music-playlist-popover__track ${item.canPlay ? "" : "is-unavailable"}`} type="button" key={item.id || `${item.title}-${index}`} onClick={() => { setTrackIndex(index); setShowPlaylist(false); }}>
-                  <span>{index + 1}</span>
-                  <span><strong>{item.title}</strong><small>{item.artist}{item.canPlay ? "" : " · 暂不可播放"}</small></span>
-                </button>
-              ))}
-            </div>
-          ) : null}
-        </div>
-      ) : null}
     </div>
   );
 }
@@ -684,6 +789,7 @@ function HomeArticleCard({ article, onOpenArticle }: { article: ArticleSummary; 
 
 function HomePage({ onPageChange, onOpenArticle, now }: { onPageChange: (page: PageKey) => void; onOpenArticle: (slug: string) => void; now: Date | null }) {
   const [latestArticles, setLatestArticles] = useState<ArticleSummary[]>([]);
+  const [chatterEntries, setChatterEntries] = useState<ChatterSummary[]>([]);
 
   useEffect(() => {
     let cancelled = false;
@@ -698,6 +804,25 @@ function HomePage({ onPageChange, onOpenArticle, now }: { onPageChange: (page: P
           })
           .catch(() => {
             // Keep the bundled sample post when the Java API and local index are unavailable.
+          });
+      });
+
+    return () => { cancelled = true; };
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    getChatterEntries(0, 3)
+      .then((result) => {
+        if (!cancelled) setChatterEntries(result.content.slice(0, 3));
+      })
+      .catch(() => {
+        getLocalChatterIndex()
+          .then((result) => {
+            if (!cancelled) setChatterEntries(result.slice(0, 3));
+          })
+          .catch(() => {
+            if (!cancelled) setChatterEntries([]);
           });
       });
 
@@ -749,11 +874,13 @@ function HomePage({ onPageChange, onOpenArticle, now }: { onPageChange: (page: P
 
           <div className="dashboard-split">
             <article className="glass-card chatter-card dashboard-card">
-              <div className="small-card-heading"><p className="card-kicker">说说</p><button className="more-button" type="button">更多</button></div>
+              <div className="small-card-heading"><p className="card-kicker">说说</p><button className="more-button" type="button" onClick={() => onPageChange("chatter")}>更多</button></div>
               <div className="chatter-list">
-                <div className="chatter-bubble">1.</div>
-                <div className="chatter-bubble">2.</div>
-                <div className="chatter-bubble">3.</div>
+                {chatterEntries.length > 0 ? chatterEntries.map((entry) => (
+                  <div className="chatter-bubble" key={entry.id ?? entry.slug}>
+                    <span className="chatter-bubble__text">{entry.preview}</span>
+                  </div>
+                )) : <div className="chatter-bubble chatter-bubble--empty">暂无说说</div>}
               </div>
             </article>
             <article className="glass-card diary-card dashboard-card">
@@ -929,7 +1056,9 @@ function MarkdownContent({ source }: { source: string }) {
 }
 
 function ArticleListPage({ onOpenArticle }: { onOpenArticle: (slug: string) => void }) {
+  const pageSize = 5;
   const [articles, setArticles] = useState<ArticleSummary[]>([]);
+  const [currentPage, setCurrentPage] = useState(0);
   const [status, setStatus] = useState<"loading" | "ready" | "fallback">("loading");
   const [hoveredSlug, setHoveredSlug] = useState<string | null>(null);
   const [previews, setPreviews] = useState<Record<string, string[]>>({});
@@ -944,6 +1073,7 @@ function ArticleListPage({ onOpenArticle }: { onOpenArticle: (slug: string) => v
       .then((result) => {
         if (!cancelled) {
           setArticles(result);
+          setCurrentPage(0);
           setStatus("ready");
         }
       })
@@ -953,12 +1083,14 @@ function ArticleListPage({ onOpenArticle }: { onOpenArticle: (slug: string) => v
             .then((result) => {
               if (!cancelled) {
                 setArticles(result);
+                setCurrentPage(0);
                 setStatus("fallback");
               }
             })
             .catch(() => {
               if (!cancelled) {
                 setArticles(fallbackArticleList);
+                setCurrentPage(0);
                 setStatus("fallback");
               }
             });
@@ -1007,22 +1139,28 @@ function ArticleListPage({ onOpenArticle }: { onOpenArticle: (slug: string) => v
     setPreviewLoadingSlug(null);
   };
 
+  const totalPages = Math.max(1, Math.ceil(articles.length / pageSize));
+  const visibleArticles = articles.slice(currentPage * pageSize, (currentPage + 1) * pageSize);
+  const goToPage = (page: number) => {
+    const nextPage = Math.min(Math.max(page, 0), totalPages - 1);
+    previewAbortRef.current?.abort();
+    setHoveredSlug(null);
+    setPreviewLoadingSlug(null);
+    setCurrentPage(nextPage);
+  };
+
   return (
     <div className="article-page article-list-page">
       <div className="article-list-stack">
         <div className="article-list-heading">
-          <div>
-            <p className="eyebrow"><span>04</span> / Article archive</p>
-            <h1>All the things worth keeping.</h1>
-          </div>
-          <p>从数据库读取已发布的文章，选择一篇继续阅读。</p>
+          <h1>Article</h1>
         </div>
 
         {status === "loading" ? <p className="article-state">正在读取文章列表…</p> : null}
         {status === "fallback" ? <p className="article-list-note">Java API 暂不可用，当前显示本地示例文章。</p> : null}
         {status !== "loading" ? (
           <div className="article-timeline" aria-label="文章列表">
-            {articles.map((article) => {
+            {visibleArticles.map((article) => {
               const createdAt = formatArticleCreatedAt(article.createdAt);
               const isHovered = hoveredSlug === article.slug;
               return (
@@ -1065,6 +1203,85 @@ function ArticleListPage({ onOpenArticle }: { onOpenArticle: (slug: string) => v
             })}
           </div>
         ) : null}
+
+        {status !== "loading" && totalPages > 1 ? (
+          <nav className="article-pagination" aria-label="文章列表分页">
+            <button type="button" onClick={() => goToPage(currentPage - 1)} disabled={currentPage === 0}>上一页</button>
+            <div className="article-pagination__pages">
+              {Array.from({ length: totalPages }, (_, page) => (
+                <button key={page} className={page === currentPage ? "is-active" : ""} type="button" aria-current={page === currentPage ? "page" : undefined} onClick={() => goToPage(page)}>{page + 1}</button>
+              ))}
+            </div>
+            <button type="button" onClick={() => goToPage(currentPage + 1)} disabled={currentPage === totalPages - 1}>下一页</button>
+          </nav>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
+function formatChatterDate(value: string | null) {
+  if (!value) return "—";
+  return value.slice(0, 10).replaceAll("-", ".");
+}
+
+function ChatterPage({ onBack }: { onBack: () => void }) {
+  const [entries, setEntries] = useState<ChatterSummary[]>([]);
+  const [status, setStatus] = useState<"loading" | "ready" | "fallback" | "error">("loading");
+
+  useEffect(() => {
+    let cancelled = false;
+
+    getChatterEntries(0, 50)
+      .then((result) => {
+        if (!cancelled) {
+          setEntries(result.content);
+          setStatus("ready");
+        }
+      })
+      .catch(() => {
+        getLocalChatterIndex()
+          .then((result) => {
+            if (!cancelled) {
+              setEntries(result);
+              setStatus("fallback");
+            }
+          })
+          .catch(() => {
+            if (!cancelled) setStatus("error");
+          });
+      });
+
+    return () => { cancelled = true; };
+  }, []);
+
+  return (
+    <div className="article-page chatter-page">
+      <div className="article-stack">
+        <button className="article-back-button" type="button" onClick={onBack}>← 返回首页</button>
+        <div className="article-cover-space chatter-cover-space" aria-label="说说头图">
+          <span className="chatter-cover-space__title">Dairy</span>
+          <span className="chatter-cover-space__hint">Small thoughts, kept gently.</span>
+        </div>
+        <article className="glass-card article-card chatter-detail-card">
+          <div className="article-card__meta"><span>Dairy</span><span>{entries.length} small notes</span></div>
+          {status === "loading" ? <p className="article-state">正在读取说说…</p> : null}
+          {status === "fallback" ? <p className="article-list-note">Python API 暂不可用，当前显示本地说说。</p> : null}
+          {status === "error" ? <p className="article-state">暂时无法读取说说，请检查后端或本地文件。</p> : null}
+          {status !== "loading" && status !== "error" ? (
+            <div className="chatter-detail-list">
+              {entries.map((entry) => {
+                const date = entry.publishedAt ?? entry.createdAt;
+                return (
+                  <article className="chatter-detail-entry" key={entry.id ?? entry.slug}>
+                    <time dateTime={date ?? undefined}>{formatChatterDate(date)}</time>
+                    <p>{entry.preview}</p>
+                  </article>
+                );
+              })}
+            </div>
+          ) : null}
+        </article>
       </div>
     </div>
   );
@@ -1137,32 +1354,38 @@ export default function Home() {
   const [selectedArticleSlug, setSelectedArticleSlug] = useState<string | null>(null);
   const now = useCurrentTime();
 
+  useEffect(() => {
+    const moveToInitialPosition = () => {
+      const maxScrollTop = Math.max(0, document.documentElement.scrollHeight - window.innerHeight);
+      window.scrollTo(0, Math.round(maxScrollTop * 0.4));
+    };
+    const frame = window.requestAnimationFrame(moveToInitialPosition);
+    const timer = window.setTimeout(moveToInitialPosition, 180);
+    return () => {
+      window.cancelAnimationFrame(frame);
+      window.clearTimeout(timer);
+    };
+  }, []);
+
   return (
     <main className="site-shell">
       <div className="ambient ambient--one" aria-hidden="true" />
       <div className="ambient ambient--two" aria-hidden="true" />
       <div className="ambient ambient--three" aria-hidden="true" />
-      <div className="cover-space" aria-label="顶部图片预留区域">
-        <div className="cover-space__inner">
-          <div className="cover-space__content shell">
-            <span className="cover-space__label">01 / Cover image</span>
-            <span className="cover-space__hint">Reserved space for your future image</span>
-          </div>
-        </div>
-      </div>
+      <CoverCarousel />
       <header className="site-header">
         <div className="site-header__inner shell">
         <div className="brand"><span className="brand-mark">✦</span><span>YOUR <i>/</i> SPACE</span></div>
-        <div className="search-pill"><span>⌕</span><span>Search this space...</span><kbd>⌘ K</kbd></div>
         <nav className="page-nav" aria-label="页面切换">
           {navigation.map((item) => <PageButton key={item.id} active={activePage === item.id} index={item.index} label={item.label} onClick={() => { setActivePage(item.id); setSelectedArticleSlug(null); }} />)}
         </nav>
+        <div className="search-pill"><span>⌕</span><span>Search this space...</span><kbd>⌘ K</kbd></div>
         <div className="header-status"><span className="header-status__presence"><span className="status-dot" /> Online-ish</span></div>
         </div>
       </header>
 
-      <div className={`content-backdrop content-backdrop--${activePage}`}>
-        {activePage !== "article" ? <ClockDisplay now={now} /> : null}
+      <div className={`content-backdrop content-backdrop--${activePage === "article" && selectedArticleSlug ? "article-detail" : activePage}`}>
+        {activePage !== "article" && activePage !== "chatter" ? <ClockDisplay now={now} /> : null}
 
         <div className="workspace-shell shell">
           <div className={`home-page-layer ${activePage === "home" ? "" : "is-hidden"}`}>
@@ -1170,12 +1393,13 @@ export default function Home() {
           </div>
           {activePage === "projects" && <ProjectsPage />}
           {activePage === "about" && <AboutPage />}
+          {activePage === "chatter" && <ChatterPage onBack={() => setActivePage("home")} />}
           {activePage === "article" && (selectedArticleSlug
             ? <ArticleDetailPage key={selectedArticleSlug} slug={selectedArticleSlug} onBack={() => setSelectedArticleSlug(null)} />
             : <ArticleListPage onOpenArticle={setSelectedArticleSlug} />)}
         </div>
 
-        {activePage !== "article" ? <footer className="site-footer shell"><span>© 2026 Your Name</span><span>Made with patience &amp; curiosity.</span><span>v.01</span></footer> : null}
+        {activePage !== "article" ? <footer className="site-footer shell"><span>© 2026 StrIn</span><span>v.0.0.1</span></footer> : null}
       </div>
     </main>
   );

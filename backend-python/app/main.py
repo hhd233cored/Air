@@ -13,6 +13,8 @@ from fastapi.responses import JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 
 from .article_service import ArticleNotFoundError, ArticleService
+from .chatter_service import ChatterNotFoundError, ChatterService
+from .chatter_models import ChatterDetail, ChatterPageResponse
 from .config import Settings
 from .historical_service import HistoricalTodayService
 from .local_music_service import LocalMusicService
@@ -23,6 +25,7 @@ from .models import ArticleDetail, ArticlePageResponse, HistoricalTodayResponse
 
 settings = Settings.from_environment()
 article_service = ArticleService(settings.article_content_dir)
+chatter_service = ChatterService(settings.chatter_content_dir)
 historical_service = HistoricalTodayService(settings.wikipedia_on_this_day_url)
 if settings.music_source == "local":
     music_service = LocalMusicService(settings.music_content_dir)
@@ -56,6 +59,16 @@ async def article_not_found(request: Request, exception: ArticleNotFoundError) -
     return _error_response(
         status_code=404,
         code="ARTICLE_NOT_FOUND",
+        message=str(exception),
+        path=request.url.path,
+    )
+
+
+@app.exception_handler(ChatterNotFoundError)
+async def chatter_not_found(request: Request, exception: ChatterNotFoundError) -> JSONResponse:
+    return _error_response(
+        status_code=404,
+        code="CHATTER_NOT_FOUND",
         message=str(exception),
         path=request.url.path,
     )
@@ -103,6 +116,19 @@ def list_articles(
 @app.get("/api/v1/articles/{slug}", response_model=ArticleDetail)
 def get_article(slug: str) -> ArticleDetail:
     return article_service.get_published(slug)
+
+
+@app.get("/api/v1/chatter", response_model=ChatterPageResponse)
+def list_chatter(
+    page: int = Query(default=0, ge=0),
+    size: int = Query(default=10, ge=1, le=50),
+) -> ChatterPageResponse:
+    return chatter_service.list_published(page, size)
+
+
+@app.get("/api/v1/chatter/{slug}", response_model=ChatterDetail)
+def get_chatter(slug: str) -> ChatterDetail:
+    return chatter_service.get_published(slug)
 
 
 @app.get("/api/v1/historical-today", response_model=HistoricalTodayResponse)

@@ -31,6 +31,7 @@ def _optional_int(name: str) -> int | None:
 class Settings:
     server_port: int
     article_content_dir: Path
+    chatter_content_dir: Path
     music_source: str
     music_content_dir: Path
     cors_allowed_origins: tuple[str, ...]
@@ -58,6 +59,10 @@ class Settings:
             server_port=int(os.getenv("SERVER_PORT", "8080")),
             article_content_dir=_resolve_path(
                 os.getenv("ARTICLE_CONTENT_DIR", "./public/articles"),
+                project_root,
+            ),
+            chatter_content_dir=_resolve_path(
+                os.getenv("CHATTER_CONTENT_DIR", "./public/chatter"),
                 project_root,
             ),
             music_source=os.getenv("MUSIC_SOURCE", "local").strip().lower() or "local",

@@ -8,11 +8,23 @@
 GET /api/v1/health
 GET /api/v1/articles
 GET /api/v1/articles/{slug}
+GET /api/v1/chatter
+GET /api/v1/chatter/{slug}
 GET /api/v1/historical-today
 GET /api/v1/music/playlist
 GET /api/v1/music/tracks/{songId}/url
 GET /api/v1/music/tracks/{songId}/cover
 ```
+
+说说保存在 `public/chatter/`，每条说说使用一个独立目录：
+
+```text
+public/chatter/life-changelog/
+  chatter.json
+  chatter.md
+```
+
+`chatter.json` 只保存 `id`、`slug`、状态和时间字段；正文保存在 `chatter.md`，不使用封面图。列表接口会从 Markdown 正文生成 `preview`，只返回 `PUBLISHED` 说说。
 
 音乐来源由 `MUSIC_SOURCE` 控制，默认是本地音乐：
 
@@ -79,6 +91,7 @@ npm.cmd run backend:python:prod
 ```env
 SERVER_PORT=8080
 ARTICLE_CONTENT_DIR=./public/articles
+CHATTER_CONTENT_DIR=./public/chatter
 MUSIC_SOURCE=local
 MUSIC_CONTENT_DIR=./music
 CORS_ALLOWED_ORIGINS=http://localhost:3000,http://127.0.0.1:3000

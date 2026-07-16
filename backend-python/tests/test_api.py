@@ -12,6 +12,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(PROJECT_ROOT / "backend-python"))
 
 from app.article_service import ArticleService  # noqa: E402
+from app.chatter_service import ChatterService  # noqa: E402
 from app.config import Settings  # noqa: E402
 from app.historical_service import HistoricalTodayService  # noqa: E402
 from app.local_music_service import LocalMusicService  # noqa: E402
@@ -76,6 +77,95 @@ def test_article_detail_and_cover_url(tmp_path: Path) -> None:
 
     assert article.contentMarkdown.startswith("# Sample")
     assert article.coverUrl == "/articles/sample/cover.svg"
+
+
+def write_chatter(
+    root: Path,
+    slug: str,
+    *,
+    published: str,
+    body: str,
+    status: str = "PUBLISHED",
+    metadata_slug: str | None = None,
+) -> None:
+    folder = root / slug
+    folder.mkdir(parents=True)
+    metadata = {
+        "id": f"chatter-{slug}",
+        "slug": metadata_slug or slug,
+        "status": status,
+        "publishedAt": published,
+        "createdAt": published,
+        "updatedAt": published,
+    }
+    (folder / "chatter.json").write_text(json.dumps(metadata), encoding="utf-8")
+    (folder / "chatter.md").write_text(body, encoding="utf-8")
+
+
+def test_chatter_service_filters_sorts_paginates_and_generates_preview(tmp_path: Path) -> None:
+    write_chatter(
+        tmp_path,
+        "older",
+        published="2026-07-14T12:00:00Z",
+        body="# Older\n\nA [small](https://example.test) note.",
+    )
+    write_chatter(
+        tmp_path,
+        "newer",
+        published="2026-07-16T12:00:00Z",
+        body="慢一点，**事情**仍然会发生。",
+    )
+    write_chatter(
+        tmp_path,
+        "draft",
+        published="2026-07-17T12:00:00Z",
+        body="Not public",
+        status="DRAFT",
+    )
+    write_chatter(
+        tmp_path,
+        "mismatch",
+        published="2026-07-18T12:00:00Z",
+        body="Invalid folder",
+        metadata_slug="different-slug",
+    )
+
+    service = ChatterService(tmp_path)
+    page = service.list_published(0, 1)
+
+    assert page.totalElements == 2
+    assert page.totalPages == 2
+    assert [entry.slug for entry in page.content] == ["newer"]
+    assert page.content[0].preview == "慢一点，事情仍然会发生。"
+    assert service.list_published(1, 1).content[0].slug == "older"
+
+
+def test_chatter_detail_returns_markdown_without_cover(tmp_path: Path) -> None:
+    write_chatter(tmp_path, "sample", published="2026-07-16T12:00:00Z", body="## Markdown body\n\nContent")
+
+    chatter = ChatterService(tmp_path).get_published("SAMPLE")
+
+    assert chatter.contentMarkdown == "## Markdown body\n\nContent"
+    assert not hasattr(chatter, "coverUrl")
+
+
+def test_chatter_api_contract_and_not_found(tmp_path: Path, monkeypatch) -> None:
+    write_chatter(tmp_path, "sample", published="2026-07-16T12:00:00Z", body="A sample chatter.")
+    monkeypatch.setattr(main, "chatter_service", ChatterService(tmp_path))
+    client = TestClient(main.app)
+
+    response = client.get("/api/v1/chatter?size=10")
+    assert response.status_code == 200
+    assert response.json()["content"][0]["slug"] == "sample"
+    assert "coverUrl" not in response.json()["content"][0]
+
+    detail = client.get("/api/v1/chatter/sample")
+    assert detail.status_code == 200
+    assert detail.json()["contentMarkdown"] == "A sample chatter."
+
+    missing = client.get("/api/v1/chatter/missing")
+    assert missing.status_code == 404
+    assert missing.json()["code"] == "CHATTER_NOT_FOUND"
 
 
 def test_api_contract_and_not_found(tmp_path: Path, monkeypatch) -> None:
