@@ -48,6 +48,161 @@ npm.cmd run dev
 
 网易云音乐播放器使用 Python 后端的代理接口。请将 `.env.example` 中的 `NETEASE_MUSIC_*` 配置复制到本地 `.env` 并填写网易云 OpenAPI 应用参数，然后使用 `npm.cmd run backend:python` 启动后端；前端会自动读取歌单，点击播放时再获取临时播放地址。官方 OpenAPI 的密钥只放在后端环境变量中，不放入前端。
 
+## Linux 启动
+
+生产服务器建议只运行 Python API，前端使用静态文件托管。服务器不需要安装 Node.js、Maven、Java、Docker 或 PostgreSQL。
+
+首次部署：
+
+```bash
+cd /opt/air
+cp .env.example .env
+nano .env
+bash backend-python/install-linux.sh
+```
+
+启动 Python 后端：
+
+```bash
+cd /opt/air
+set -a
+. ./.env
+set +a
+backend-python/.venv/bin/uvicorn app.main:app \
+  --app-dir backend-python \
+  --host 127.0.0.1 \
+  --port "${SERVER_PORT:-8080}" \
+  --workers 1
+```
+
+测试接口：
+
+```bash
+curl http://127.0.0.1:8080/api/v1/health
+curl http://127.0.0.1:8080/api/v1/articles
+curl http://127.0.0.1:8080/api/v1/chatter
+curl http://127.0.0.1:8080/api/v1/historical-today
+```
+
+也可以使用 systemd 托管后端，创建 `/etc/systemd/system/air-backend.service`：
+
+```ini
+[Unit]
+Description=Air lightweight Python API
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/air
+EnvironmentFile=/opt/air/.env
+ExecStart=/opt/air/backend-python/.venv/bin/uvicorn app.main:app --app-dir /opt/air/backend-python --host 127.0.0.1 --port 8080 --workers 1
+Restart=always
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target
+```
+
+启用并查看日志：
+
+```bash
+sudo systemctl daemon-reload
+sudo systemctl enable --now air-backend
+sudo systemctl status air-backend
+journalctl -u air-backend -f
+```
+
+## 静态前端部署
+
+当前前端主要由浏览器执行页面切换、轮播图、播放器和 API 请求，适合静态部署。静态部署前端后，服务器不需要运行 `npm run dev` 或 `vinext start`，可以减少服务器内存占用。
+
+项目已经在 [next.config.ts](next.config.ts) 中启用静态导出：
+
+```ts
+import type { NextConfig } from "next";
+
+const nextConfig: NextConfig = {
+  output: "export",
+  trailingSlash: true,
+};
+
+export default nextConfig;
+```
+
+在构建机器上配置生产 API 地址。若前端和后端使用同一个域名，推荐使用相对路径：
+
+```env
+NEXT_PUBLIC_API_BASE_URL=
+```
+
+如果前后端使用不同域名，则填写后端地址：
+
+```env
+NEXT_PUBLIC_API_BASE_URL=https://api.example.com
+```
+
+然后构建：
+
+```bash
+npm install
+npm run build
+```
+
+项目的 `build` 命令会自动使用静态导出模式。Windows 下如果 vinext 在构建完成后输出 Node/libuv 清理断言，构建脚本会在确认 `dist/client/index.html` 已生成后将其视为可忽略的清理问题。
+
+静态文件通常位于：
+
+```text
+dist/client/
+```
+
+该目录应包含 `index.html`、`assets/`、`articles/` 和 `chatter/`。构建机器需要 Node.js，但部署静态文件的服务器不需要 Node.js。
+
+本地预览静态文件：
+
+```bash
+python3 -m http.server 3000 --directory dist/client
+```
+
+### Nginx 配置
+
+将 `dist/client/` 上传到服务器，例如 `/var/www/air/dist/client`，然后配置：
+
+```nginx
+server {
+    listen 80;
+    server_name example.com;
+
+    root /var/www/air/dist/client;
+    index index.html;
+
+    location / {
+        try_files $uri $uri/ /index.html;
+    }
+
+    location /api/ {
+        proxy_pass http://127.0.0.1:8080;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    }
+
+    location /music/ {
+        proxy_pass http://127.0.0.1:8080;
+        proxy_set_header Host $host;
+    }
+}
+```
+
+修改配置后检查并重载 Nginx：
+
+```bash
+sudo nginx -t
+sudo systemctl reload nginx
+```
+
+如果使用 Cloudflare Pages，构建命令填写 `npm run build`，输出目录填写 `dist/client`；`NEXT_PUBLIC_API_BASE_URL` 需要在 Cloudflare Pages 的环境变量中配置。
+
 ## 生产打包
 
 ```powershell
