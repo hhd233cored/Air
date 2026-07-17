@@ -12,13 +12,11 @@ type PageKey = "home" | "projects" | "about" | "article" | "chatter";
 
 const navigation: { id: PageKey; label: string; index: string }[] = [
   { id: "home", label: "Home", index: "01" },
-  { id: "projects", label: "Projects", index: "02" },
-  { id: "about", label: "About", index: "03" },
-  { id: "article", label: "Article", index: "04" },
-  { id: "chatter", label: "Dairy", index: "05" },
+  { id: "article", label: "Article", index: "02" },
+  { id: "chatter", label: "Dairy", index: "03" },
 ];
 
-const coverImages = ["1.png", "2.jpg", "3.png","4.png"].sort((left, right) => Number.parseInt(left, 10) - Number.parseInt(right, 10));
+const coverImages = ["1.png", "2.jpg", "3.png","4.png","5.jpg","6.png","7.png","8.jpg"].sort((left, right) => Number.parseInt(left, 10) - Number.parseInt(right, 10));
 
 const projects = [
   { title: "Luma Notes", type: "Product / 2026", description: "A quiet place for ideas, fragments, and the things worth keeping.", color: "lilac" },
@@ -679,7 +677,7 @@ function MusicPlayerBar({ compact = false }: { compact?: boolean }) {
     <div className={`music-player-block ${compact ? "music-player-block--compact" : ""} ${showPlaylist ? "is-playlist-open" : ""}`}>
       <article className="music-player-bar">
         <div className="music-bar__track-info">
-          <div className={`music-bar__cover ${isPlaying ? "is-playing" : ""}`} style={track.cover ? { backgroundImage: `url(${track.cover})` } : undefined} />
+          <div key={track.id ?? trackIndex} className={`music-bar__cover ${isPlaying ? "is-playing" : ""}`} style={track.cover ? { backgroundImage: `url(${track.cover})` } : undefined} />
           {track.title || track.artist ? <div className={`music-bar__track-label ${track.artist ? "" : "is-single"}`}><strong>{track.title}</strong>{track.artist ? <><span className="music-bar__separator"> - </span><small>{track.artist}</small></> : null}</div> : null}
         </div>
         <div className="music-bar__center">
@@ -788,7 +786,7 @@ function HomeArticleCard({ article, onOpenArticle }: { article: ArticleSummary; 
   );
 }
 
-function HomePage({ onPageChange, onOpenArticle, now }: { onPageChange: (page: PageKey) => void; onOpenArticle: (slug: string) => void; now: Date | null }) {
+function HomePage({ onPageChange, onOpenArticle, onOpenChatter, onOpenAbout, now }: { onPageChange: (page: PageKey) => void; onOpenArticle: (slug: string) => void; onOpenChatter: () => void; onOpenAbout: () => void; now: Date | null }) {
   const [latestArticles, setLatestArticles] = useState<ArticleSummary[]>([]);
   const [chatterEntries, setChatterEntries] = useState<ChatterSummary[]>([]);
 
@@ -836,7 +834,10 @@ function HomePage({ onPageChange, onOpenArticle, now }: { onPageChange: (page: P
     <>
       <div className="dashboard-grid">
         <article className="glass-card profile-card dashboard-card dashboard-card--profile">
-          <div className="card-topline profile-card__topline"><span>Profile</span><span>•••</span></div>
+          <div className="card-topline profile-card__topline">
+            <span>Profile</span>
+            <button className="profile-card__more" type="button" aria-label="打开 About 页面" onClick={onOpenAbout}>•••</button>
+          </div>
           <div className="profile-main">
             <div className="avatar">
               <img src="/picture/portrait.png" alt="Profile portrait" />
@@ -875,13 +876,27 @@ function HomePage({ onPageChange, onOpenArticle, now }: { onPageChange: (page: P
 
           <div className="dashboard-split">
             <article className="glass-card chatter-card dashboard-card">
-              <div className="small-card-heading"><p className="card-kicker">说说</p><button className="more-button" type="button" onClick={() => onPageChange("chatter")}>更多</button></div>
-              <div className="chatter-list">
-                {chatterEntries.length > 0 ? chatterEntries.map((entry) => (
-                  <div className="chatter-bubble" key={entry.id ?? entry.slug}>
-                    <span className="chatter-bubble__text">{entry.preview}</span>
-                  </div>
-                )) : <div className="chatter-bubble chatter-bubble--empty">暂无说说</div>}
+              <div className="card-heading">
+                <div><p className="card-kicker">Dairy</p><h2>最新说说</h2></div>
+              </div>
+              <div className="chatter-list chatter-list--home">
+                {chatterEntries.length > 0 ? chatterEntries.slice(0, 1).map((entry) => {
+                  const date = entry.publishedAt ?? entry.createdAt;
+                  return (
+                    <button className="chatter-home-entry" type="button" key={entry.id ?? entry.slug} onClick={onOpenChatter}>
+                      <div className="chatter-home-entry__top">
+                        <div className="chatter-home-entry__avatar">
+                          <img src="/picture/portrait.png" alt="" loading="lazy" decoding="async" />
+                        </div>
+                        <div className="chatter-home-entry__meta">
+                          <strong>S t r I n</strong>
+                          <time dateTime={date ?? undefined}>{formatChatterDate(date)}</time>
+                        </div>
+                      </div>
+                      <p>{entry.preview}</p>
+                    </button>
+                  );
+                }) : <div className="chatter-home-entry chatter-home-entry--empty">暂无说说</div>}
               </div>
             </article>
             <article className="glass-card diary-card dashboard-card">
@@ -1154,7 +1169,10 @@ function ArticleListPage({ onOpenArticle }: { onOpenArticle: (slug: string) => v
     <div className="article-page article-list-page">
       <div className="article-list-stack">
         <div className="article-list-heading">
-          <h1>Article</h1>
+          <div className="article-search-bar" role="search">
+            <span className="article-search-bar__icon" aria-hidden="true">⌕</span>
+            <input type="search" aria-label="搜索文章" placeholder="搜索文章..." />
+          </div>
         </div>
 
         {status === "loading" ? <p className="article-state">正在读取文章列表…</p> : null}
@@ -1226,7 +1244,7 @@ function formatChatterDate(value: string | null) {
   return value.slice(0, 10).replaceAll("-", ".");
 }
 
-function ChatterPage({ onBack }: { onBack: () => void }) {
+function ChatterPage() {
   const [entries, setEntries] = useState<ChatterSummary[]>([]);
   const [status, setStatus] = useState<"loading" | "ready" | "fallback" | "error">("loading");
 
@@ -1259,13 +1277,10 @@ function ChatterPage({ onBack }: { onBack: () => void }) {
   return (
     <div className="article-page chatter-page">
       <div className="article-stack">
-        <button className="article-back-button" type="button" onClick={onBack}>← 返回首页</button>
         <div className="article-cover-space chatter-cover-space" aria-label="说说头图">
           <span className="chatter-cover-space__title">Dairy</span>
-          <span className="chatter-cover-space__hint">Small thoughts, kept gently.</span>
         </div>
         <article className="glass-card article-card chatter-detail-card">
-          <div className="article-card__meta"><span>Dairy</span><span>{entries.length} small notes</span></div>
           {status === "loading" ? <p className="article-state">正在读取说说…</p> : null}
           {status === "fallback" ? <p className="article-list-note">Python API 暂不可用，当前显示本地说说。</p> : null}
           {status === "error" ? <p className="article-state">暂时无法读取说说，请检查后端或本地文件。</p> : null}
@@ -1275,7 +1290,15 @@ function ChatterPage({ onBack }: { onBack: () => void }) {
                 const date = entry.publishedAt ?? entry.createdAt;
                 return (
                   <article className="chatter-detail-entry" key={entry.id ?? entry.slug}>
-                    <time dateTime={date ?? undefined}>{formatChatterDate(date)}</time>
+                    <div className="chatter-detail-entry__top">
+                      <div className="chatter-detail-entry__avatar">
+                        <img src="/picture/portrait.png" alt="" loading="lazy" decoding="async" />
+                      </div>
+                      <div className="chatter-detail-entry__meta">
+                        <strong>S t r I n</strong>
+                        <time dateTime={date ?? undefined}>{formatChatterDate(date)}</time>
+                      </div>
+                    </div>
                     <p>{entry.preview}</p>
                   </article>
                 );
@@ -1290,8 +1313,8 @@ function ChatterPage({ onBack }: { onBack: () => void }) {
 
 function ArticleDetailPage({ slug, onBack }: { slug: string; onBack: () => void }) {
   const [source, setSource] = useState("");
-  const [articleTitle, setArticleTitle] = useState("Markdown document");
   const [coverUrl, setCoverUrl] = useState<string | null>(null);
+  const [articleDate, setArticleDate] = useState<string | null>(null);
   const [status, setStatus] = useState<"loading" | "ready" | "error">("loading");
 
   useEffect(() => {
@@ -1302,8 +1325,8 @@ function ArticleDetailPage({ slug, onBack }: { slug: string; onBack: () => void 
         const article = await getPublishedArticle(slug);
         if (!cancelled) {
           setSource(article.contentMarkdown);
-          setArticleTitle(article.title);
           setCoverUrl(article.coverUrl);
+          setArticleDate(article.publishedAt ?? article.createdAt);
           setStatus("ready");
         }
         return;
@@ -1315,8 +1338,8 @@ function ArticleDetailPage({ slug, onBack }: { slug: string; onBack: () => void 
         const localArticle = await getLocalArticleDetail(slug);
         if (!cancelled) {
           setSource(localArticle.contentMarkdown);
-          setArticleTitle(localArticle.title);
           setCoverUrl(localArticle.coverUrl);
+          setArticleDate(localArticle.publishedAt ?? localArticle.createdAt);
           setStatus("ready");
         }
       } catch {
@@ -1332,15 +1355,21 @@ function ArticleDetailPage({ slug, onBack }: { slug: string; onBack: () => void 
   return (
     <div className="article-page">
       <div className="article-stack">
-        <button className="article-back-button" type="button" onClick={onBack}>← 返回文章列表</button>
         <div
           className={`article-cover-space ${coverUrl ? "has-image" : ""}`}
           aria-label="文章头图"
         >
+          <button className="article-cover-back-button" type="button" aria-label="返回文章列表" onClick={onBack}>←</button>
           {coverUrl ? <img className="article-cover-space__image" src={coverUrl} alt="" loading="eager" decoding="async" /> : null}
         </div>
+        <div className="article-seam-avatar" aria-hidden="true">
+          <img src="/picture/portrait.png" alt="" loading="lazy" decoding="async" />
+        </div>
         <article className="glass-card article-card">
-          <div className="article-card__meta"><span>{articleTitle}</span></div>
+          {articleDate ? (() => {
+            const formattedDate = formatArticleCreatedAt(articleDate);
+            return <time className="article-detail-date" dateTime={articleDate}>{formattedDate.date} {formattedDate.time}</time>;
+          })() : null}
           {status === "loading" ? <p className="article-state">正在读取 Markdown…</p> : null}
           {status === "error" ? <p className="article-state">暂时无法读取文章内容，请检查 Java API 或 Markdown 文件。</p> : null}
           {status === "ready" ? <MarkdownContent source={source} /> : null}
@@ -1353,7 +1382,61 @@ function ArticleDetailPage({ slug, onBack }: { slug: string; onBack: () => void 
 function SiteApp() {
   const [activePage, setActivePage] = useState<PageKey>("home");
   const [selectedArticleSlug, setSelectedArticleSlug] = useState<string | null>(null);
+  const pendingNavigationScrollRef = useRef(false);
   const now = useCurrentTime();
+
+  const openContentPage = (page: PageKey) => {
+    pendingNavigationScrollRef.current = true;
+    setActivePage(page);
+    setSelectedArticleSlug(null);
+  };
+
+  const openArticle = (slug: string) => {
+    pendingNavigationScrollRef.current = true;
+    setSelectedArticleSlug(slug);
+    setActivePage("article");
+  };
+
+  const returnHomeToInitialPosition = () => {
+    setActivePage("home");
+    setSelectedArticleSlug(null);
+    window.requestAnimationFrame(() => {
+      window.requestAnimationFrame(() => {
+        const moveToInitialPosition = () => {
+          const maxScrollTop = Math.max(0, document.documentElement.scrollHeight - window.innerHeight);
+          window.scrollTo(0, Math.round(maxScrollTop * 0.4));
+        };
+        moveToInitialPosition();
+        window.setTimeout(moveToInitialPosition, 180);
+      });
+    });
+  };
+
+  useEffect(() => {
+    if (!pendingNavigationScrollRef.current) return;
+    pendingNavigationScrollRef.current = false;
+
+    let timer: number | undefined;
+    const applyNavigationScroll = () => {
+      const cover = document.querySelector<HTMLElement>(".cover-space");
+      const targetTop = cover?.offsetHeight ?? 0;
+      const header = document.querySelector<HTMLElement>(".site-header");
+      const resolvedTop = targetTop || header?.offsetTop || 0;
+      window.scrollTo(0, resolvedTop);
+      document.documentElement.scrollTop = resolvedTop;
+      document.body.scrollTop = resolvedTop;
+    };
+
+    const frame = window.requestAnimationFrame(() => {
+      applyNavigationScroll();
+      timer = window.setTimeout(applyNavigationScroll, 80);
+    });
+
+    return () => {
+      window.cancelAnimationFrame(frame);
+      if (timer !== undefined) window.clearTimeout(timer);
+    };
+  }, [activePage, selectedArticleSlug]);
 
   useEffect(() => {
     const moveToInitialPosition = () => {
@@ -1376,12 +1459,13 @@ function SiteApp() {
       <CoverCarousel />
       <header className="site-header">
         <div className="site-header__inner shell">
-        <div className="brand"><span className="brand-mark">✦</span><span>YOUR <i>/</i> SPACE</span></div>
+        <button className="brand brand-button" type="button" aria-label="返回主页" onClick={returnHomeToInitialPosition}><span>AirChord <i>/</i> StrInの小站</span></button>
         <nav className="page-nav" aria-label="页面切换">
           {navigation.map((item) => <PageButton key={item.id} active={activePage === item.id} index={item.index} label={item.label} onClick={() => { setActivePage(item.id); setSelectedArticleSlug(null); }} />)}
         </nav>
-        <div className="search-pill"><span>⌕</span><span>Search this space...</span><kbd>⌘ K</kbd></div>
-        <div className="header-status"><span className="header-status__presence"><span className="status-dot" /> Online-ish</span></div>
+        <div className="header-status">
+          <button className="header-user-button" type="button" aria-label="用户账户" title="用户账户" />
+        </div>
         </div>
       </header>
 
@@ -1390,14 +1474,14 @@ function SiteApp() {
 
         <div className="workspace-shell shell">
           <div className={`home-page-layer ${activePage === "home" ? "" : "is-hidden"}`}>
-            <HomePage onPageChange={setActivePage} onOpenArticle={(slug) => { setSelectedArticleSlug(slug); setActivePage("article"); }} now={now} />
+          <HomePage onPageChange={setActivePage} onOpenArticle={openArticle} onOpenChatter={() => openContentPage("chatter")} onOpenAbout={() => openContentPage("about")} now={now} />
           </div>
           {activePage === "projects" && <ProjectsPage />}
           {activePage === "about" && <AboutPage />}
-          {activePage === "chatter" && <ChatterPage onBack={() => setActivePage("home")} />}
+          {activePage === "chatter" && <ChatterPage />}
           {activePage === "article" && (selectedArticleSlug
             ? <ArticleDetailPage key={selectedArticleSlug} slug={selectedArticleSlug} onBack={() => setSelectedArticleSlug(null)} />
-            : <ArticleListPage onOpenArticle={setSelectedArticleSlug} />)}
+            : <ArticleListPage onOpenArticle={openArticle} />)}
         </div>
 
         {activePage !== "article" ? <footer className="site-footer shell"><span>© 2026 StrIn</span><span>v.0.0.1</span></footer> : null}

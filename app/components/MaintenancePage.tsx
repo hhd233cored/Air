@@ -6,7 +6,7 @@ export function MaintenancePage() {
 
       <section className="maintenance-card" aria-labelledby="maintenance-title">
         <div className="maintenance-card__mark" aria-hidden="true">✦</div>
-        <p className="maintenance-card__eyebrow">YOUR / SPACE</p>
+        <p className="maintenance-card__eyebrow">AirChord</p>
         <h1 id="maintenance-title">网站维护中</h1>
         <p className="maintenance-card__english">A small space is being refreshed.</p>
         <p className="maintenance-card__message">

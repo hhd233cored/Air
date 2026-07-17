@@ -13,8 +13,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Your Space — Personal Site",
-  description: "一个可持续更新的个人空间模板。",
+  title: "AirChord",
+  description: "StrIn的个人网站",
   icons: {
     icon: "/favicon.svg",
     shortcut: "/favicon.svg",
