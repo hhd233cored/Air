@@ -1,5 +1,7 @@
 # Your Space
 
+本地文章编辑器说明见 [`docs/LOCAL-ARTICLE-EDITOR.md`](docs/LOCAL-ARTICLE-EDITOR.md)。它默认关闭，只在本机通过 `npm.cmd run editor:local` 启用。
+
 这是一个轻量化个人博客，包含 vinext 前端和只读 API。项目同时保留 Java Spring Boot 版本，并新增了资源占用更低的 FastAPI Python 版本。
 
 ## 环境要求

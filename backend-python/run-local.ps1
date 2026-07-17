@@ -17,15 +17,18 @@ if (Test-Path -LiteralPath $environmentFile) {
     }
 }
 
-$python = $null
+$pythonPath = $null
 $venvPython = Join-Path $PSScriptRoot ".venv\Scripts\python.exe"
 if (Test-Path -LiteralPath $venvPython) {
-    $python = Get-Item -LiteralPath $venvPython
+    $pythonPath = (Get-Item -LiteralPath $venvPython).FullName
 } else {
-    $python = Get-Command python -ErrorAction SilentlyContinue
+    $pythonCommand = Get-Command python -ErrorAction SilentlyContinue
+    if ($pythonCommand) {
+        $pythonPath = if ($pythonCommand.Path) { $pythonCommand.Path } else { $pythonCommand.Source }
+    }
 }
 
-if (-not $python) {
+if (-not $pythonPath) {
     Write-Error "Python 3.11+ was not found. Install Python or create backend-python\.venv first."
     exit 1
 }
@@ -35,7 +38,7 @@ $hostAddress = if ($env:PYTHON_HOST) { $env:PYTHON_HOST } else { "127.0.0.1" }
 
 Push-Location $PSScriptRoot
 try {
-    & $python.Source -m uvicorn app.main:app --host $hostAddress --port $port
+    & $pythonPath -m uvicorn app.main:app --host $hostAddress --port $port
     exit $LASTEXITCODE
 }
 finally {

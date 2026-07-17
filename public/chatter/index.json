@@ -1,29 +1,11 @@
 [
   {
     "id": "chatter-life-changelog",
-    "slug": "life-changelog",
-    "preview": "如果生活也有 changelog，会写些什么？",
+    "slug": "airchord-0",
+    "preview": "我的第一个个人网站 AirChord 也是做出来了，可喜可贺。也欢迎大家前来游玩喵",
     "status": "PUBLISHED",
-    "publishedAt": "2026-07-16T12:00:00Z",
+    "publishedAt": "2026-07-18T13:10:00.000Z",
     "createdAt": "2026-07-16T12:00:00Z",
-    "updatedAt": "2026-07-16T12:00:00Z"
-  },
-  {
-    "id": "chatter-slow-down",
-    "slug": "slow-down",
-    "preview": "慢一点，事情仍然会在自己的时间里发生。",
-    "status": "PUBLISHED",
-    "publishedAt": "2026-07-15T12:00:00Z",
-    "createdAt": "2026-07-15T12:00:00Z",
-    "updatedAt": "2026-07-15T12:00:00Z"
-  },
-  {
-    "id": "chatter-keep-today",
-    "slug": "keep-today",
-    "preview": "把今天留给一点微小、但值得记住的东西。",
-    "status": "PUBLISHED",
-    "publishedAt": "2026-07-14T12:00:00Z",
-    "createdAt": "2026-07-14T12:00:00Z",
-    "updatedAt": "2026-07-14T12:00:00Z"
+    "updatedAt": "2026-07-17T17:39:31.011214Z"
   }
 ]

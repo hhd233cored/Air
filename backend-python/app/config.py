@@ -27,9 +27,22 @@ def _optional_int(name: str) -> int | None:
         raise ValueError(f"{name} must be an integer") from exc
 
 
+def _boolean(name: str, default: bool = False) -> bool:
+    value = os.getenv(name)
+    if value is None or not value.strip():
+        return default
+    normalized = value.strip().lower()
+    if normalized in {"1", "true", "yes", "on"}:
+        return True
+    if normalized in {"0", "false", "no", "off"}:
+        return False
+    raise ValueError(f"{name} must be a boolean")
+
+
 @dataclass(frozen=True)
 class Settings:
     server_port: int
+    editor_enabled: bool
     article_content_dir: Path
     chatter_content_dir: Path
     music_source: str
@@ -57,6 +70,7 @@ class Settings:
         )
         return cls(
             server_port=int(os.getenv("SERVER_PORT", "8080")),
+            editor_enabled=_boolean("EDITOR_ENABLED"),
             article_content_dir=_resolve_path(
                 os.getenv("ARTICLE_CONTENT_DIR", "./public/articles"),
                 project_root,

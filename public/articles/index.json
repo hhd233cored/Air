@@ -1,62 +1,16 @@
 [
   {
     "id": "55555555-5555-5555-5555-555555555555",
-    "slug": "first-note",
-    "title": "First note",
-    "summary": "The first sample article served by the Java API.",
-    "coverUrl": "/articles/first-note/cover.svg",
-    "tags": ["notes"],
+    "slug": "airchord-0",
+    "title": "AirChord开始运营啦",
+    "summary": "网站开放",
+    "coverUrl": "/articles/airchord-0/7e7c2be670b7cd9db3121b524b0743fb6722657.jpg",
+    "tags": [
+      "notes"
+    ],
     "status": "PUBLISHED",
-    "publishedAt": "2026-07-14T12:00:00Z",
+    "publishedAt": "2026-07-18T13:38:00.000Z",
     "createdAt": "2026-07-14T12:00:00Z",
-    "updatedAt": "2026-07-14T12:00:00Z"
-  },
-  {
-    "id": "11111111-1111-1111-1111-111111111111",
-    "slug": "quiet-corner",
-    "title": "Notes from a quiet corner",
-    "summary": "A small collection of thoughts, references, and unfinished ideas.",
-    "coverUrl": "/articles/quiet-corner/cover.svg",
-    "tags": ["notes", "personal"],
-    "status": "PUBLISHED",
-    "publishedAt": "2026-07-13T12:00:00Z",
-    "createdAt": "2026-07-13T12:00:00Z",
-    "updatedAt": "2026-07-13T12:00:00Z"
-  },
-  {
-    "id": "22222222-2222-2222-2222-222222222222",
-    "slug": "building-a-place-for-notes",
-    "title": "Building a place for notes",
-    "summary": "Why a personal website should feel more like a room than a feed.",
-    "coverUrl": "/articles/building-a-place-for-notes/cover.jpg",
-    "tags": ["notes", "design"],
-    "status": "PUBLISHED",
-    "publishedAt": "2026-07-12T12:00:00Z",
-    "createdAt": "2026-07-12T12:00:00Z",
-    "updatedAt": "2026-07-12T12:00:00Z"
-  },
-  {
-    "id": "33333333-3333-3333-3333-333333333333",
-    "slug": "the-weather-of-a-day",
-    "title": "The weather of a day",
-    "summary": "A short record of light, rain, and the small changes between them.",
-    "coverUrl": "/articles/the-weather-of-a-day/cover.svg",
-    "tags": ["diary", "observations"],
-    "status": "PUBLISHED",
-    "publishedAt": "2026-07-10T12:00:00Z",
-    "createdAt": "2026-07-10T12:00:00Z",
-    "updatedAt": "2026-07-10T12:00:00Z"
-  },
-  {
-    "id": "44444444-4444-4444-4444-444444444444",
-    "slug": "small-things-worth-keeping",
-    "title": "Small things worth keeping",
-    "summary": "A list of little references collected over one ordinary week.",
-    "coverUrl": "/articles/small-things-worth-keeping/cover.svg",
-    "tags": ["links", "personal"],
-    "status": "PUBLISHED",
-    "publishedAt": "2026-07-08T12:00:00Z",
-    "createdAt": "2026-07-08T12:00:00Z",
-    "updatedAt": "2026-07-08T12:00:00Z"
+    "updatedAt": "2026-07-17T17:45:52.725063Z"
   }
 ]

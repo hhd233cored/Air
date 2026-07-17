@@ -16,7 +16,7 @@ const navigation: { id: PageKey; label: string; index: string }[] = [
   { id: "chatter", label: "Dairy", index: "03" },
 ];
 
-const coverImages = ["1.png", "2.jpg", "3.png","4.png","5.jpg","6.png","7.png","8.jpg"].sort((left, right) => Number.parseInt(left, 10) - Number.parseInt(right, 10));
+const coverImages = ["1.png", "2.jpg", "3.png","4.png","5.jpg","6.png","7.jpg","8.jpg"].sort((left, right) => Number.parseInt(left, 10) - Number.parseInt(right, 10));
 
 const projects = [
   { title: "Luma Notes", type: "Product / 2026", description: "A quiet place for ideas, fragments, and the things worth keeping.", color: "lilac" },
@@ -978,7 +978,7 @@ function MarkdownContent({ source }: { source: string }) {
 
   const flushParagraph = () => {
     if (paragraph.length) {
-      blocks.push(<p key={`paragraph-${blocks.length}`}>{renderInlineMarkdown(paragraph.join(" "))}</p>);
+      blocks.push(<p key={`paragraph-${blocks.length}`}>{renderInlineMarkdown(paragraph.join("\n"))}</p>);
       paragraph = [];
     }
   };
@@ -1180,11 +1180,12 @@ function ArticleListPage({ onOpenArticle }: { onOpenArticle: (slug: string) => v
         {status !== "loading" ? (
           <div className="article-timeline" aria-label="文章列表">
             {visibleArticles.map((article) => {
-              const createdAt = formatArticleCreatedAt(article.createdAt);
+              const timelineDate = article.createdAt ?? article.publishedAt;
+              const createdAt = formatArticleCreatedAt(timelineDate);
               const isHovered = hoveredSlug === article.slug;
               return (
                 <div className="article-timeline-item" key={article.id}>
-                  <time className="article-timeline-date" dateTime={article.createdAt ?? undefined}><strong>{createdAt.date}</strong><span>{createdAt.time}</span></time>
+                  <time className="article-timeline-date" dateTime={timelineDate ?? undefined}><strong>{createdAt.date}</strong><span>{createdAt.time}</span></time>
                   <span className="article-timeline-dot" aria-hidden="true" />
                   <button
                     className={`glass-card article-list-card ${article.coverUrl ? "has-cover" : ""} ${isHovered ? "is-hovered" : ""}`}

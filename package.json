@@ -13,6 +13,7 @@
     "lint": "eslint . --ignore-pattern dist --ignore-pattern .next",
     "backend:local": "powershell -ExecutionPolicy Bypass -File backend/run-local.ps1",
     "backend:python": "powershell -ExecutionPolicy Bypass -File backend-python/run-local.ps1",
+    "editor:local": "powershell -ExecutionPolicy Bypass -File backend-python/run-editor.ps1",
     "backend:package": "mvn -f backend/pom.xml -DskipTests package",
     "backend:prod": "powershell -ExecutionPolicy Bypass -File backend/run-prod.ps1",
     "backend:python:prod": "powershell -ExecutionPolicy Bypass -File backend-python/run-prod.ps1",

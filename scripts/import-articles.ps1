@@ -42,6 +42,20 @@ foreach ($item in @($manifest.articles)) {
     }
     Copy-Item -LiteralPath $contentPath -Destination (Join-Path $articleDirectory "article.md") -Force
 
+    $assetDirectory = if ($item.assetDirectory) {
+        Join-Path $inputRoot ([string]$item.assetDirectory).Replace('/', '\')
+    } else {
+        Join-Path $inputRoot "articles\$slug\assets"
+    }
+    if (Test-Path -LiteralPath $assetDirectory -PathType Container) {
+        foreach ($asset in @(Get-ChildItem -LiteralPath $assetDirectory -File -Recurse)) {
+            $relativeAsset = $asset.FullName.Substring($assetDirectory.Length).TrimStart('\', '/')
+            $targetAsset = Join-Path (Join-Path $articleDirectory "assets") $relativeAsset
+            New-Item -ItemType Directory -Path (Split-Path -Parent $targetAsset) -Force | Out-Null
+            Copy-Item -LiteralPath $asset.FullName -Destination $targetAsset -Force
+        }
+    }
+
     $coverName = $null
     $coverFile = [string]$item.coverFile
     if (-not [string]::IsNullOrWhiteSpace($coverFile)) {

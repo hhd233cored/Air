@@ -29,17 +29,18 @@ if (Test-Path -LiteralPath $venvPython) {
 }
 
 if (-not $pythonPath) {
-    Write-Error "Python 3.11+ was not found. Run the Linux installer on Linux or create backend-python\.venv on Windows."
+    Write-Error "Python 3.11+ was not found. Install Python or create backend-python\.venv first."
     exit 1
 }
 
-$port = if ($env:SERVER_PORT) { $env:SERVER_PORT } else { "8080" }
-$hostAddress = if ($env:PYTHON_HOST) { $env:PYTHON_HOST } else { "0.0.0.0" }
-$env:EDITOR_ENABLED = "false"
+$env:EDITOR_ENABLED = "true"
+$editorPort = if ($env:EDITOR_SERVER_PORT) { $env:EDITOR_SERVER_PORT } else { "8090" }
+$env:SERVER_PORT = $editorPort
+$hostAddress = if ($env:EDITOR_BIND_HOST) { $env:EDITOR_BIND_HOST } else { "127.0.0.1" }
 
 Push-Location $PSScriptRoot
 try {
-    & $pythonPath -m uvicorn app.main:app --host $hostAddress --port $port --workers 1
+    & $pythonPath -m uvicorn app.main:app --host $hostAddress --port $env:SERVER_PORT
     exit $LASTEXITCODE
 }
 finally {

@@ -33,6 +33,16 @@ foreach ($sourceDirectory in @(Get-ChildItem -LiteralPath $articlesRoot -Directo
     Copy-Item -LiteralPath $metadataPath -Destination (Join-Path $targetDirectory "article.json") -Force
     Copy-Item -LiteralPath $contentPath -Destination (Join-Path $targetDirectory "article.md") -Force
 
+    $sourceAssets = Join-Path $sourceDirectory.FullName "assets"
+    if (Test-Path -LiteralPath $sourceAssets -PathType Container) {
+        foreach ($asset in @(Get-ChildItem -LiteralPath $sourceAssets -File -Recurse)) {
+            $relativeAsset = $asset.FullName.Substring($sourceAssets.Length).TrimStart('\', '/')
+            $targetAsset = Join-Path (Join-Path $targetDirectory "assets") $relativeAsset
+            New-Item -ItemType Directory -Path (Split-Path -Parent $targetAsset) -Force | Out-Null
+            Copy-Item -LiteralPath $asset.FullName -Destination $targetAsset -Force
+        }
+    }
+
     $coverFile = $null
     if (-not [string]::IsNullOrWhiteSpace([string]$metadata.cover)) {
         $sourceCover = Join-Path $sourceDirectory.FullName ([string]$metadata.cover).Replace('/', '\')
@@ -55,6 +65,7 @@ foreach ($sourceDirectory in @(Get-ChildItem -LiteralPath $articlesRoot -Directo
         createdAt = $metadata.createdAt
         updatedAt = $metadata.updatedAt
         contentFile = "articles/$slug/article.md"
+        assetDirectory = "articles/$slug/assets"
     }
 }
 
