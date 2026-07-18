@@ -34,6 +34,15 @@ export function getChatterEntry(slug: string) {
   return apiGet<ChatterDetail>(`/chatter/${encodeURIComponent(slug)}`);
 }
 
+export function getLocalChatterEntry(slug: string) {
+  return fetch(`/chatter/${encodeURIComponent(slug)}/chatter.md`, {
+    headers: { Accept: "text/markdown" },
+  }).then(async (response) => {
+    if (!response.ok) throw new Error(`Local chatter detail request failed with status ${response.status}`);
+    return response.text();
+  });
+}
+
 export function getLocalChatterIndex() {
   if (localChatterCache.expiresAt > Date.now()) return Promise.resolve(localChatterCache.value);
   if (localChatterRequest) return localChatterRequest;

@@ -3,9 +3,10 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { MarkdownRenderer } from "../components/MarkdownRenderer";
+import { NotFoundPage } from "../components/NotFoundPage";
 import { ChatterEditor } from "./ChatterEditor";
 import { ApiRequestError } from "../lib/api/client";
-import { deleteEditorArticle, getEditorArticle, getEditorArticles, saveEditorArticle, type EditorArticleInput } from "../lib/api/editor";
+import { deleteEditorArticle, getEditorArticle, getEditorArticles, getEditorCurrentUser, saveEditorArticle, type EditorArticleInput } from "../lib/api/editor";
 import type { ArticleSummary } from "../lib/api/articles";
 
 const editorEnabled = process.env.NEXT_PUBLIC_EDITOR_ENABLED === "true";
@@ -53,15 +54,30 @@ export default function EditorPage() {
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [editorMode, setEditorMode] = useState<"articles" | "chatter">("articles");
+  const [authStatus, setAuthStatus] = useState<"checking" | "allowed" | "denied">(editorEnabled ? "checking" : "allowed");
   const coverObjectUrl = useRef<string | null>(null);
   const previewSource = useMemo(() => form.contentMarkdown || "在左侧输入 Markdown，右侧会实时显示预览。", [form.contentMarkdown]);
 
   useEffect(() => {
     if (!editorEnabled) return;
     let active = true;
-    getEditorArticles().then((response) => { if (active) setArticles(response.content); }).catch((reason) => { if (active) setError(errorMessage(reason)); }).finally(() => { if (active) setLoading(false); });
+    getEditorCurrentUser()
+      .then(({ user }) => {
+        if (user.role !== "ADMIN") throw new Error("Editor access denied");
+        if (active) setAuthStatus("allowed");
+      })
+      .catch(() => {
+        if (active) setAuthStatus("denied");
+      });
     return () => { active = false; };
   }, []);
+
+  useEffect(() => {
+    if (!editorEnabled || authStatus !== "allowed") return;
+    let active = true;
+    getEditorArticles().then((response) => { if (active) setArticles(response.content); }).catch((reason) => { if (active) setError(errorMessage(reason)); }).finally(() => { if (active) setLoading(false); });
+    return () => { active = false; };
+  }, [authStatus]);
 
   useEffect(() => () => { if (coverObjectUrl.current) URL.revokeObjectURL(coverObjectUrl.current); }, []);
 
@@ -119,6 +135,8 @@ export default function EditorPage() {
   };
 
   if (!editorEnabled) return <main className="editor-page"><section className="editor-disabled glass-card"><p className="card-kicker">LOCAL EDITOR</p><h1>编辑器未启用</h1><p>请在本地 .env 设置 NEXT_PUBLIC_EDITOR_ENABLED=true，然后重新启动前端。</p></section></main>;
+  if (authStatus === "denied") return <NotFoundPage />;
+  if (authStatus === "checking") return <main className="editor-page"><section className="editor-disabled glass-card">正在检查登录状态…</section></main>;
 
   if (editorMode === "chatter") return <ChatterEditor onBack={() => setEditorMode("articles")} />;
 

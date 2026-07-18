@@ -3,20 +3,25 @@
 import { type ReactNode, useCallback, useEffect, useRef, useState } from "react";
 import { resolveApiUrl } from "./lib/api/client";
 import { type ArticleSummary, getAllPublishedArticles, getLocalArticleDetail, getLocalArticleIndex, getPublishedArticle, getPublishedArticles, isAbortError } from "./lib/api/articles";
-import { getChatterEntries, getLocalChatterIndex, type ChatterSummary } from "./lib/api/chatter";
+import { getChatterEntries, getChatterEntry, getLocalChatterEntry, getLocalChatterIndex, type ChatterSummary } from "./lib/api/chatter";
 import { type HistoricalTodayEvent, getHistoricalToday } from "./lib/api/historical";
 import { getMusicPlaylist, getMusicTrackUrl, type MusicTrackSummary } from "./lib/api/music";
+import { type AuthUser, getCurrentUser } from "./lib/api/auth";
+import { AuthPanel } from "./components/AuthPanel";
+import { CommentsPanel } from "./components/CommentsPanel";
+import { MarkdownRenderer } from "./components/MarkdownRenderer";
 import { MaintenancePage } from "./components/MaintenancePage";
 
-type PageKey = "home" | "projects" | "about" | "article" | "chatter";
+type PageKey = "home" | "projects" | "article" | "chatter" | "guestbook";
 
 const navigation: { id: PageKey; label: string; index: string }[] = [
   { id: "home", label: "Home", index: "01" },
   { id: "article", label: "Article", index: "02" },
   { id: "chatter", label: "Dairy", index: "03" },
+  { id: "guestbook", label: "Guestbook", index: "04" },
 ];
 
-const coverImages = ["1.png", "2.jpg", "3.png","4.png","5.jpg","6.png","7.jpg","8.jpg"].sort((left, right) => Number.parseInt(left, 10) - Number.parseInt(right, 10));
+const coverImages = ["1.png", "2.jpg", "3.png","4.png","5.jpg","6.png","7.jpg","8.png","9.jpg"].sort((left, right) => Number.parseInt(left, 10) - Number.parseInt(right, 10));
 
 const projects = [
   { title: "Luma Notes", type: "Product / 2026", description: "A quiet place for ideas, fragments, and the things worth keeping.", color: "lilac" },
@@ -269,7 +274,7 @@ function useLocalWeather() {
   return { weather, status };
 }
 
-function HistoricalTodayPanel({ now }: { now: Date | null }) {
+function HistoricalTodayPanel({ now, marginTop }: { now: Date | null; marginTop?: number | null }) {
   const reference = now ?? new Date(2026, 6, 13);
   const month = String(reference.getMonth() + 1).padStart(2, "0");
   const day = String(reference.getDate()).padStart(2, "0");
@@ -303,7 +308,7 @@ function HistoricalTodayPanel({ now }: { now: Date | null }) {
   }, [dateKey, hourKey]);
 
   return (
-    <section className="calendar-history" aria-label="历史上的今天">
+    <section className="calendar-history" aria-label="历史上的今天" style={marginTop == null ? undefined : { marginTop: `${marginTop}px` }}>
       <div className="calendar-history__heading">
         <strong>歷史上的今天</strong>
         <span>{dateLabel}</span>
@@ -468,7 +473,7 @@ function GlassHeader({ eyebrow, title, copy }: { eyebrow: string; title: string;
   );
 }
 
-function CalendarCard({ now }: { now: Date | null }) {
+function CalendarCard({ now, cardRef, historyMarginTop }: { now: Date | null; cardRef?: React.RefObject<HTMLElement | null>; historyMarginTop?: number | null }) {
   const today = now ?? new Date(2026, 6, 13);
   const [viewDate, setViewDate] = useState<Date | null>(null);
   const reference = viewDate ?? today;
@@ -488,7 +493,7 @@ function CalendarCard({ now }: { now: Date | null }) {
     setViewDate(new Date(year, monthIndex + offset, 1));
   };
   return (
-    <article className="glass-card calendar-card dashboard-card">
+    <article ref={cardRef} className="glass-card calendar-card dashboard-card">
       <div className="calendar-card__month">
         <button className="calendar-nav-button" type="button" onClick={() => changeMonth(-1)} aria-label="查看上个月" title="上个月">‹</button>
         <span>{month}</span>
@@ -505,7 +510,7 @@ function CalendarCard({ now }: { now: Date | null }) {
           );
         })}
       </div>
-      <HistoricalTodayPanel now={now} />
+      <HistoricalTodayPanel now={now} marginTop={historyMarginTop} />
     </article>
   );
 }
@@ -786,9 +791,12 @@ function HomeArticleCard({ article, onOpenArticle }: { article: ArticleSummary; 
   );
 }
 
-function HomePage({ onPageChange, onOpenArticle, onOpenChatter, onOpenAbout, now }: { onPageChange: (page: PageKey) => void; onOpenArticle: (slug: string) => void; onOpenChatter: () => void; onOpenAbout: () => void; now: Date | null }) {
+function HomePage({ onPageChange, onOpenArticle, onOpenChatter, onOpenGuestbook, now }: { onPageChange: (page: PageKey) => void; onOpenArticle: (slug: string) => void; onOpenChatter: () => void; onOpenGuestbook: () => void; now: Date | null }) {
   const [latestArticles, setLatestArticles] = useState<ArticleSummary[]>([]);
   const [chatterEntries, setChatterEntries] = useState<ChatterSummary[]>([]);
+  const chatterCardRef = useRef<HTMLElement | null>(null);
+  const calendarCardRef = useRef<HTMLElement | null>(null);
+  const [calendarHistoryMarginTop, setCalendarHistoryMarginTop] = useState<number | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -807,6 +815,38 @@ function HomePage({ onPageChange, onOpenArticle, onOpenChatter, onOpenAbout, now
       });
 
     return () => { cancelled = true; };
+  }, []);
+
+  useEffect(() => {
+    const chatterCard = chatterCardRef.current;
+    const calendarCard = calendarCardRef.current;
+    const calendarGrid = calendarCard?.querySelector<HTMLElement>(".calendar-grid");
+    if (!chatterCard || !calendarCard || !calendarGrid) return;
+
+    const updateHistoryPosition = () => {
+      const chatterRect = chatterCard.getBoundingClientRect();
+      const calendarRect = calendarCard.getBoundingClientRect();
+      const gridRect = calendarGrid.getBoundingClientRect();
+
+      // On narrow layouts the cards stack vertically, so the history panel
+      // should keep its natural position instead of aligning to the article.
+      if (chatterRect.left <= calendarRect.right) {
+        setCalendarHistoryMarginTop(null);
+        return;
+      }
+
+      setCalendarHistoryMarginTop(Math.max(0, Math.round(chatterRect.top - gridRect.bottom)));
+    };
+
+    updateHistoryPosition();
+    const resizeObserver = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(updateHistoryPosition);
+    resizeObserver?.observe(chatterCard);
+    resizeObserver?.observe(calendarCard);
+    window.addEventListener("resize", updateHistoryPosition);
+    return () => {
+      resizeObserver?.disconnect();
+      window.removeEventListener("resize", updateHistoryPosition);
+    };
   }, []);
 
   useEffect(() => {
@@ -836,7 +876,7 @@ function HomePage({ onPageChange, onOpenArticle, onOpenChatter, onOpenAbout, now
         <article className="glass-card profile-card dashboard-card dashboard-card--profile">
           <div className="card-topline profile-card__topline">
             <span>Profile</span>
-            <button className="profile-card__more" type="button" aria-label="打开 About 页面" onClick={onOpenAbout}>•••</button>
+            <button className="profile-card__more" type="button" aria-label="更多">•••</button>
           </div>
           <div className="profile-main">
             <div className="avatar">
@@ -866,7 +906,7 @@ function HomePage({ onPageChange, onOpenArticle, onOpenChatter, onOpenAbout, now
 
         <MusicPlayerBar compact />
 
-        <CalendarCard now={now} />
+        <CalendarCard now={now} cardRef={calendarCardRef} historyMarginTop={calendarHistoryMarginTop} />
 
         <div className="feed-column">
           <article className="glass-card posts-card dashboard-card">
@@ -875,7 +915,7 @@ function HomePage({ onPageChange, onOpenArticle, onOpenChatter, onOpenAbout, now
           </article>
 
           <div className="dashboard-split">
-            <article className="glass-card chatter-card dashboard-card">
+            <article ref={chatterCardRef} className="glass-card chatter-card dashboard-card">
               <div className="card-heading">
                 <div><p className="card-kicker">Dairy</p><h2>最新说说</h2></div>
               </div>
@@ -899,9 +939,17 @@ function HomePage({ onPageChange, onOpenArticle, onOpenChatter, onOpenAbout, now
                 }) : <div className="chatter-home-entry chatter-home-entry--empty">暂无说说</div>}
               </div>
             </article>
-            <article className="glass-card diary-card dashboard-card">
-              <WeatherPanel />
-            </article>
+            <div className="dashboard-side-stack">
+              <button className="glass-card guestbook-home-entry" type="button" onClick={onOpenGuestbook}>
+                <span>
+                  <small>Guestbook</small>
+                  <strong>留言板</strong>
+                </span>
+              </button>
+              <article className="glass-card diary-card dashboard-card">
+                <WeatherPanel />
+              </article>
+            </div>
           </div>
         </div>
 
@@ -929,19 +977,6 @@ function ProjectsPage() {
           <div className="index-list"><span><b>01</b> Luma Notes</span><span><b>02</b> Orbit / 01</span><span><b>03</b> Slow Internet</span></div>
           <div className="card-footer">Built slowly, with care.</div>
         </aside>
-      </div>
-    </>
-  );
-}
-
-function AboutPage() {
-  return (
-    <>
-      <GlassHeader eyebrow="A little context / 03" title="A person behind the pixels." copy="一个很简单的自我介绍页面，先保持轻量，后续可以继续加履历、链接和更多个人内容。" />
-      <div className="about-layout">
-        <article className="glass-card about-card about-card--intro"><div className="avatar avatar--large">YN</div><p className="card-kicker">A note from me</p><p className="about-lede">我喜欢把复杂的东西变简单，把模糊的感受变成清晰的形状。好的设计像一扇门，不抢你的注意力，但会让你愿意多走一步。</p><span className="signature">YN ✳</span></article>
-        <article className="glass-card about-card"><p className="card-kicker">Toolkit</p><div className="toolkit-list"><span>Figma</span><span>React</span><span>TypeScript</span><span>Writing</span><span>摄影</span><span>散步</span></div><div className="card-footer">Always learning ∞</div></article>
-        <article className="glass-card about-card about-card--now"><p className="card-kicker">Now / July</p><h2>Building something gentle.</h2><div className="now-line"><span /></div><div className="card-footer">Reading Ursula K. Le Guin ↗</div></article>
       </div>
     </>
   );
@@ -1242,11 +1277,16 @@ function ArticleListPage({ onOpenArticle }: { onOpenArticle: (slug: string) => v
 
 function formatChatterDate(value: string | null) {
   if (!value) return "—";
-  return value.slice(0, 10).replaceAll("-", ".");
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  const datePart = `${date.getFullYear()}.${String(date.getMonth() + 1).padStart(2, "0")}.${String(date.getDate()).padStart(2, "0")}`;
+  const timePart = `${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")}`;
+  return `${datePart}  ${timePart}`;
 }
 
-function ChatterPage() {
+function ChatterPage({ currentUser, onRequestLogin }: { currentUser: AuthUser | null; onRequestLogin: () => void }) {
   const [entries, setEntries] = useState<ChatterSummary[]>([]);
+  const [contentBySlug, setContentBySlug] = useState<Record<string, string>>({});
   const [status, setStatus] = useState<"loading" | "ready" | "fallback" | "error">("loading");
 
   useEffect(() => {
@@ -1275,6 +1315,28 @@ function ChatterPage() {
     return () => { cancelled = true; };
   }, []);
 
+  useEffect(() => {
+    if (!entries.length) return;
+    let cancelled = false;
+
+    Promise.all(entries.map(async (entry) => {
+      try {
+        const detail = await getChatterEntry(entry.slug);
+        return [entry.slug, detail.contentMarkdown] as const;
+      } catch {
+        try {
+          return [entry.slug, await getLocalChatterEntry(entry.slug)] as const;
+        } catch {
+          return [entry.slug, entry.preview] as const;
+        }
+      }
+    })).then((content) => {
+      if (!cancelled) setContentBySlug(Object.fromEntries(content));
+    });
+
+    return () => { cancelled = true; };
+  }, [entries]);
+
   return (
     <div className="article-page chatter-page">
       <div className="article-stack">
@@ -1300,7 +1362,15 @@ function ChatterPage() {
                         <time dateTime={date ?? undefined}>{formatChatterDate(date)}</time>
                       </div>
                     </div>
-                    <p>{entry.preview}</p>
+                    <div className="chatter-detail-entry__body">
+                      <MarkdownRenderer source={contentBySlug[entry.slug] ?? entry.preview} />
+                    </div>
+                    <CommentsPanel
+                      targetType="CHATTER"
+                      targetSlug={entry.slug}
+                      currentUser={currentUser}
+                      onRequestLogin={onRequestLogin}
+                    />
                   </article>
                 );
               })}
@@ -1312,7 +1382,42 @@ function ChatterPage() {
   );
 }
 
-function ArticleDetailPage({ slug, onBack }: { slug: string; onBack: () => void }) {
+function GuestbookPage({ currentUser, onRequestLogin }: { currentUser: AuthUser | null; onRequestLogin: () => void }) {
+  return (
+    <div className="article-page guestbook-page">
+      <div className="article-stack">
+        <div className="article-cover-space guestbook-cover-space" aria-label="留言板">
+          <span className="guestbook-cover-space__title">Guestbook</span>
+        </div>
+        <article className="glass-card article-card guestbook-card">
+          <div className="guestbook-heading">
+            <p className="guestbook-heading__eyebrow">GUESTBOOK</p>
+            <h1>留言板</h1>
+          </div>
+          <CommentsPanel
+            targetType="GUESTBOOK"
+            targetSlug="main"
+            currentUser={currentUser}
+            onRequestLogin={onRequestLogin}
+            defaultOpen
+          />
+        </article>
+      </div>
+    </div>
+  );
+}
+
+function ArticleDetailPage({
+  slug,
+  onBack,
+  currentUser,
+  onRequestLogin,
+}: {
+  slug: string;
+  onBack: () => void;
+  currentUser: AuthUser | null;
+  onRequestLogin: () => void;
+}) {
   const [source, setSource] = useState("");
   const [coverUrl, setCoverUrl] = useState<string | null>(null);
   const [articleDate, setArticleDate] = useState<string | null>(null);
@@ -1374,6 +1479,15 @@ function ArticleDetailPage({ slug, onBack }: { slug: string; onBack: () => void 
           {status === "loading" ? <p className="article-state">正在读取 Markdown…</p> : null}
           {status === "error" ? <p className="article-state">暂时无法读取文章内容，请检查 Java API 或 Markdown 文件。</p> : null}
           {status === "ready" ? <MarkdownContent source={source} /> : null}
+          {status === "ready" ? (
+            <CommentsPanel
+              targetType="ARTICLE"
+              targetSlug={slug}
+              currentUser={currentUser}
+              onRequestLogin={onRequestLogin}
+              defaultOpen
+            />
+          ) : null}
         </article>
       </div>
     </div>
@@ -1383,8 +1497,16 @@ function ArticleDetailPage({ slug, onBack }: { slug: string; onBack: () => void 
 function SiteApp() {
   const [activePage, setActivePage] = useState<PageKey>("home");
   const [selectedArticleSlug, setSelectedArticleSlug] = useState<string | null>(null);
+  const [authUser, setAuthUser] = useState<AuthUser | null>(null);
+  const [authPanelOpen, setAuthPanelOpen] = useState(false);
   const pendingNavigationScrollRef = useRef(false);
   const now = useCurrentTime();
+
+  useEffect(() => {
+    getCurrentUser()
+      .then((response) => setAuthUser(response.user))
+      .catch(() => setAuthUser(null));
+  }, []);
 
   const openContentPage = (page: PageKey) => {
     pendingNavigationScrollRef.current = true;
@@ -1465,23 +1587,38 @@ function SiteApp() {
           {navigation.map((item) => <PageButton key={item.id} active={activePage === item.id} index={item.index} label={item.label} onClick={() => { setActivePage(item.id); setSelectedArticleSlug(null); }} />)}
         </nav>
         <div className="header-status">
+          <button
+            className={`header-auth-button${authUser ? " is-authenticated" : ""}`}
+            type="button"
+            aria-label={authUser ? `${authUser.username}账户` : "登录"}
+            title={authUser ? `${authUser.username} · ${authUser.role}` : "登录"}
+            aria-expanded={authPanelOpen}
+            onClick={() => setAuthPanelOpen((open) => !open)}
+          >
+            {authUser?.avatarUrl ? <img src={resolveApiUrl(authUser.avatarUrl)} alt="" /> : authUser ? <span className="header-auth-button__empty" aria-hidden="true" /> : null}
+          </button>
+          {authUser ? <span className="header-auth-label"><strong>{authUser.username}</strong><small>{authUser.role}</small></span> : null}
+          {authPanelOpen ? <AuthPanel user={authUser} onUserChange={setAuthUser} onClose={() => setAuthPanelOpen(false)} onOpenAdmin={() => { setAuthPanelOpen(false); window.location.assign("/admin/"); }} onOpenEditor={() => { setAuthPanelOpen(false); window.location.assign("/editor/"); }} /> : null}
           <button className="header-user-button" type="button" aria-label="用户账户" title="用户账户" />
         </div>
         </div>
       </header>
 
       <div className={`content-backdrop content-backdrop--${activePage === "article" && selectedArticleSlug ? "article-detail" : activePage}`}>
-        {activePage !== "article" && activePage !== "chatter" ? <ClockDisplay now={now} /> : null}
+        {activePage === "article" && selectedArticleSlug ? <div className="content-backdrop__detail-background" aria-hidden="true" /> : null}
+        {activePage === "chatter" ? <div className="content-backdrop__chatter-background" aria-hidden="true" /> : null}
+        {activePage === "guestbook" ? <div className="content-backdrop__guestbook-background" aria-hidden="true" /> : null}
+        {activePage !== "article" && activePage !== "chatter" && activePage !== "guestbook" ? <ClockDisplay now={now} /> : null}
 
         <div className="workspace-shell shell">
           <div className={`home-page-layer ${activePage === "home" ? "" : "is-hidden"}`}>
-          <HomePage onPageChange={setActivePage} onOpenArticle={openArticle} onOpenChatter={() => openContentPage("chatter")} onOpenAbout={() => openContentPage("about")} now={now} />
+          <HomePage onPageChange={setActivePage} onOpenArticle={openArticle} onOpenChatter={() => openContentPage("chatter")} onOpenGuestbook={() => openContentPage("guestbook")} now={now} />
           </div>
           {activePage === "projects" && <ProjectsPage />}
-          {activePage === "about" && <AboutPage />}
-          {activePage === "chatter" && <ChatterPage />}
+          {activePage === "chatter" && <ChatterPage currentUser={authUser} onRequestLogin={() => setAuthPanelOpen(true)} />}
+          {activePage === "guestbook" && <GuestbookPage currentUser={authUser} onRequestLogin={() => setAuthPanelOpen(true)} />}
           {activePage === "article" && (selectedArticleSlug
-            ? <ArticleDetailPage key={selectedArticleSlug} slug={selectedArticleSlug} onBack={() => setSelectedArticleSlug(null)} />
+            ? <ArticleDetailPage key={selectedArticleSlug} slug={selectedArticleSlug} onBack={() => setSelectedArticleSlug(null)} currentUser={authUser} onRequestLogin={() => setAuthPanelOpen(true)} />
             : <ArticleListPage onOpenArticle={openArticle} />)}
         </div>
 

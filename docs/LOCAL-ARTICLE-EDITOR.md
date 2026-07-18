@@ -15,7 +15,7 @@ backend-python\.venv\Scripts\python.exe -m pip install -r backend-python\require
 
 ```env
 NEXT_PUBLIC_EDITOR_ENABLED=true
-NEXT_PUBLIC_EDITOR_API_BASE_URL=http://127.0.0.1:8090
+NEXT_PUBLIC_EDITOR_API_BASE_URL=http://localhost:8090
 ```
 
 然后分别启动前端和本地编辑 API：
@@ -65,4 +65,31 @@ PUT  /api/v1/editor/chatter/{slug}
 DELETE /api/v1/editor/chatter/{slug}
 ```
 
+## 编辑器登录
+
+编辑接口需要管理员登录，写请求还需要 CSRF Token。编辑器仍然只绑定本机地址，不会因为开启鉴权而公开到公网。
+
+本地 `.env` 至少配置：
+
+```env
+AUTH_ENABLED=true
+AUTH_ADMIN_USERNAME=admin
+AUTH_ADMIN_PASSWORD=change-this-password
+EDITOR_ENABLED=true
+NEXT_PUBLIC_EDITOR_ENABLED=true
+NEXT_PUBLIC_API_BASE_URL=http://localhost:8080
+NEXT_PUBLIC_EDITOR_API_BASE_URL=http://localhost:8090
+```
+
+先启动主 API，再启动编辑 API。打开主页，在导航栏登录管理员账号，然后访问 `http://localhost:3000/editor`。主 API 和编辑 API 必须使用相同主机名，不能一个使用 `localhost`、另一个使用 `127.0.0.1`，否则浏览器不会共享会话 Cookie。
+
+普通用户访问编辑接口返回 `403 AUTH_FORBIDDEN`，未登录访问返回 `401 AUTH_REQUIRED`。
+
 删除文章需要在编辑器中确认，且会同时从 `public/articles/` 和公开回退索引中移除。生产只读启动脚本不会打开编辑模式。完成编辑后，使用正常的 Git 操作提交 `public/articles/`，再按静态前端和只读后端的部署流程发布。
+# 评论、回复与头像
+
+本地编辑器和主站共用 Python 后端的 SQLite 鉴权数据库。文章详情页和说说页会显示评论；评论立即公开，访客可以读取，登录用户才可以发布、一级回复和删除自己的评论。
+
+用户登录后可在导航栏账户面板上传 PNG、JPEG 或 WebP 头像。头像二进制保存于 SQLite，不会写入 `public/`。默认大小限制为 2 MiB，可通过 `AUTH_AVATAR_MAX_BYTES` 调整；评论可通过 `COMMENTS_ENABLED` 和 `COMMENTS_MAX_LENGTH` 配置。
+
+生产部署时请备份 `backend-python/data/auth.sqlite3`，并继续保持编辑接口只在可信环境开放。

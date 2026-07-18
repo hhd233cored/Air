@@ -10,7 +10,7 @@ export class ApiRequestError extends Error {
   }
 }
 
-const apiBaseUrl = (process.env.NEXT_PUBLIC_API_BASE_URL ?? "").replace(/\/$/, "");
+export const apiBaseUrl = (process.env.NEXT_PUBLIC_API_BASE_URL ?? "").replace(/\/$/, "");
 
 export function resolveApiUrl(value: string | null | undefined) {
   if (!value) return "";
@@ -20,7 +20,7 @@ export function resolveApiUrl(value: string | null | undefined) {
 }
 
 export async function apiRequest<T>(path: string, init: RequestInit = {}): Promise<T> {
-  if (!apiBaseUrl) throw new ApiRequestError("Java API base URL is not configured");
+  if (!apiBaseUrl) throw new ApiRequestError("API base URL is not configured");
 
   const headers = new Headers(init.headers);
   headers.set("Accept", "application/json");
@@ -28,6 +28,7 @@ export async function apiRequest<T>(path: string, init: RequestInit = {}): Promi
 
   const response = await fetch(`${apiBaseUrl}/api/v1${path}`, {
     ...init,
+    credentials: "include",
     headers,
   });
 

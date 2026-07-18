@@ -6,6 +6,14 @@
 
 ```text
 GET /api/v1/health
+GET /api/v1/admin/users
+POST /api/v1/admin/users
+PATCH /api/v1/admin/users/{id}
+POST /api/v1/admin/users/{id}/reset-password
+PUT /api/v1/admin/users/{id}/avatar
+DELETE /api/v1/admin/users/{id}/avatar
+GET /api/v1/admin/settings/registration
+PATCH /api/v1/admin/settings/registration
 GET /api/v1/articles
 GET /api/v1/articles/{slug}
 GET /api/v1/chatter
@@ -15,6 +23,32 @@ GET /api/v1/music/playlist
 GET /api/v1/music/tracks/{songId}/url
 GET /api/v1/music/tracks/{songId}/cover
 ```
+
+## Python 后端鉴权（SQLite）
+
+鉴权数据只保存在 `backend-python/data/auth.sqlite3`，不需要 PostgreSQL、Docker 或 ORM。首次启动时，如果账号不存在，服务会根据环境变量创建管理员和可选普通用户；已存在账号不会被环境变量覆盖。
+
+```env
+AUTH_ENABLED=true
+AUTH_DATABASE_PATH=./backend-python/data/auth.sqlite3
+AUTH_ADMIN_USERNAME=admin
+AUTH_ADMIN_PASSWORD=change-this-password
+AUTH_USER_USERNAME=reader
+AUTH_USER_PASSWORD=change-this-password
+AUTH_SESSION_TIMEOUT=7d
+AUTH_COOKIE_NAME=air_session
+AUTH_COOKIE_SECURE=false
+AUTH_COOKIE_SAMESITE=Lax
+AUTH_CSRF_ENABLED=true
+AUTH_REGISTRATION_ENABLED=true
+CORS_ALLOWED_ORIGINS=http://localhost:3000,http://127.0.0.1:3000,https://airchord.org,https://www.airchord.org
+```
+
+密码至少 8 个字符。生产环境使用 HTTPS 时设置 `AUTH_COOKIE_SECURE=true`；只有在前端与 API 被浏览器视为跨站时，才将 `AUTH_COOKIE_SAMESITE` 改为 `None`。
+
+鉴权接口为 `GET /api/v1/auth/csrf`、`POST /api/v1/auth/register`、`POST /api/v1/auth/login`、`POST /api/v1/auth/logout` 和 `GET /api/v1/auth/me`。公开注册创建的账号永远是 `USER`，不能通过接口创建管理员。管理员可以在 `/admin` 页面控制公开注册，或者调用 `/api/v1/admin/settings/registration`；该设置保存到 SQLite，`AUTH_REGISTRATION_ENABLED` 只作为首次初始化默认值。公开 GET 接口保持匿名可用；只有 ADMIN 可以访问本地编辑器接口，USER 只能登录并读取公开内容。编辑器仍由 `EDITOR_ENABLED=true` 控制，生产启动脚本会强制关闭。
+
+本地编辑时先启动主 API，再启动编辑 API；两个进程要使用相同主机名（推荐都使用 `localhost`），浏览器才能共享 Cookie。登录主站后再打开 `/editor`。鉴权数据库已经加入 Git 忽略规则，但生产服务器应备份 `backend-python/data/auth.sqlite3`。
 
 说说保存在 `public/chatter/`，每条说说使用一个独立目录：
 
@@ -133,3 +167,87 @@ backend-python/.venv/bin/python -m pytest backend-python/tests -q
 ```
 
 Java 版本仍保留在 `backend/`，可继续使用原来的 Maven 命令。
+# 评论与头像（新增功能）
+
+评论使用同一个轻量 SQLite 鉴权数据库保存，不使用 PostgreSQL 或独立文件服务。公开文章和说说的评论可以匿名读取；只有登录用户可以发表评论、一级回复和删除自己的评论。评论发布后立即公开，管理员可以通过接口隐藏、恢复或删除评论。
+
+新增配置：
+
+```env
+COMMENTS_ENABLED=true
+COMMENTS_MAX_LENGTH=1000
+AUTH_AVATAR_MAX_BYTES=2097152
+```
+
+接口：
+
+```text
+GET  /api/v1/articles/{slug}/comments
+POST /api/v1/articles/{slug}/comments
+GET  /api/v1/chatter/{slug}/comments
+POST /api/v1/chatter/{slug}/comments
+DELETE /api/v1/comments/{id}
+GET  /api/v1/admin/comments
+PATCH /api/v1/admin/comments/{id}
+PUT  /api/v1/auth/me/avatar
+DELETE /api/v1/auth/me/avatar
+GET  /api/v1/users/{id}/avatar
+```
+
+头像只接受 PNG、JPEG 和 WebP，默认限制为 2 MiB，图片二进制直接保存到 SQLite 的 `users.avatar_data` 字段。升级旧数据库时，服务会自动增加头像字段和 `comments` 表；`backend-python/data/` 仍然需要纳入服务器备份并保持在 Git 忽略列表中。
+## 后端限流
+
+Python 后端现在包含一个单进程内存滑动窗口限流器，不使用 Redis、数据库计数或额外服务。生产脚本继续使用一个 Uvicorn worker，因此适合当前的轻量部署方式。
+
+默认策略如下：
+
+| 场景 | 默认限制 |
+| --- | --- |
+| 登录：单 IP | 5 次 / 60 秒 |
+| 登录：同一用户名 | 10 次 / 10 分钟 |
+| 注册：单 IP | 3 次 / 1 小时 |
+| 文章/说说评论：单 IP | 20 次 / 60 秒 |
+| 文章/说说评论：同一用户 | 10 次 / 60 秒 |
+| 留言板：单 IP | 10 次 / 1 小时 |
+| 留言板：同一用户 | 3 次 / 1 小时 |
+| 更换头像：同一用户 | 5 次 / 1 小时 |
+| 管理员和编辑写操作 | 60 次 / 60 秒 |
+| CSRF Token 获取/写请求 | 30 次 / 60 秒 |
+
+超过限制时返回 HTTP `429`，并携带 `Retry-After`、`X-RateLimit-Limit`、`X-RateLimit-Remaining` 和 `X-RateLimit-Reset`。错误正文仍使用统一格式：
+
+```json
+{
+  "code": "RATE_LIMITED",
+  "message": "请求过于频繁，请稍后再试"
+}
+```
+
+### 配置
+
+所有限流参数都可以在根目录 `.env` 中调整，示例见 `.env.example`。例如：
+
+```env
+RATE_LIMIT_ENABLED=true
+RATE_LIMIT_LOGIN_IP_MAX=5
+RATE_LIMIT_LOGIN_IP_WINDOW=60s
+RATE_LIMIT_COMMENT_USER_MAX=10
+RATE_LIMIT_COMMENT_USER_WINDOW=60s
+```
+
+设置 `RATE_LIMIT_ENABLED=false` 可以临时关闭 Python 后端限流。关闭只影响应用层，不会关闭 Cloudflare 的边缘规则。
+
+默认使用 `request.client.host` 作为 IP 标识，不会直接信任浏览器自行提交的 `X-Forwarded-For` 或 `CF-Connecting-IP`。只有在前面确实有受信任的反向代理时，才设置：
+
+```env
+RATE_LIMIT_TRUST_PROXY_HEADERS=true
+TRUSTED_PROXY_IPS=127.0.0.1
+```
+
+如果直接让 Cloudflare 访问后端，建议把登录和注册的第一层防护放在 Cloudflare WAF，应用层继续作为后备限制；不要把后端源站直接暴露成可以绕过 Cloudflare 的入口。
+
+Cloudflare 的规则可在 [WAF Rate limiting rules](https://developers.cloudflare.com/waf/rate-limiting-rules/) 中配置。登录、注册等 API 建议返回 `429`，不使用需要 HTML 挑战页面的交互式验证；具体可用规则数量和时间窗口取决于 Cloudflare 套餐。
+
+### 部署边界
+
+内存限流只在当前 Python 进程内生效。将来如果启动多个 worker 或多台服务器，计数会被分散，届时应将 `rate_limit.py` 替换为 Redis 等共享存储实现；不建议把每次请求写入 SQLite，因为这会增加锁竞争和磁盘写入。

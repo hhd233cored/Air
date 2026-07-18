@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import json
 import sys
+from dataclasses import replace
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -17,6 +18,7 @@ from app.config import Settings  # noqa: E402
 from app.historical_service import HistoricalTodayService  # noqa: E402
 from app.local_music_service import LocalMusicService  # noqa: E402
 from app.music_service import MusicService  # noqa: E402
+from app.auth_service import AuthService  # noqa: E402
 import app.historical_service as historical_module  # noqa: E402
 import app.local_music_service as local_music_module  # noqa: E402
 import app.main as main  # noqa: E402
@@ -181,6 +183,147 @@ def test_api_contract_and_not_found(tmp_path: Path, monkeypatch) -> None:
     missing = client.get("/api/v1/articles/missing")
     assert missing.status_code == 404
     assert missing.json()["code"] == "ARTICLE_NOT_FOUND"
+
+
+def test_auth_login_me_logout_and_csrf(tmp_path: Path, monkeypatch) -> None:
+    service = AuthService(tmp_path / "auth.sqlite3", session_timeout_seconds=3600)
+    service.initialize_users(admin_username="admin", admin_password="admin-password")
+    monkeypatch.setattr(main, "auth_service", service)
+    monkeypatch.setattr(
+        main,
+        "settings",
+        replace(
+            main.settings,
+            auth_enabled=True,
+            auth_csrf_enabled=True,
+            auth_registration_enabled=True,
+            auth_cookie_secure=False,
+            auth_cookie_name="test_session",
+        ),
+    )
+    client = TestClient(main.app)
+
+    csrf = client.get("/api/v1/auth/csrf")
+    assert csrf.status_code == 200
+    token = csrf.json()["token"]
+    assert client.cookies.get("XSRF-TOKEN") == token
+
+    registered = client.post(
+        "/api/v1/auth/register",
+        json={"username": "new-reader", "password": "reader-password"},
+        headers={"X-XSRF-TOKEN": token},
+    )
+    assert registered.status_code == 201
+    assert registered.json()["user"]["role"] == "USER"
+    client.post("/api/v1/auth/logout", headers={"X-XSRF-TOKEN": token})
+
+    missing_csrf = client.post(
+        "/api/v1/auth/login",
+        json={"username": "admin", "password": "admin-password"},
+    )
+    assert missing_csrf.status_code == 403
+    assert missing_csrf.json()["code"] == "CSRF_INVALID"
+
+    logged_in = client.post(
+        "/api/v1/auth/login",
+        json={"username": "admin", "password": "admin-password"},
+        headers={"X-XSRF-TOKEN": token},
+    )
+    assert logged_in.status_code == 200
+    assert logged_in.json()["user"]["role"] == "ADMIN"
+    assert client.get("/api/v1/auth/me").json()["user"]["username"] == "admin"
+
+    logged_out = client.post("/api/v1/auth/logout", headers={"X-XSRF-TOKEN": token})
+    assert logged_out.status_code == 204
+    assert client.get("/api/v1/auth/me").status_code == 401
+
+
+def test_admin_user_api_requires_role_csrf_and_returns_safe_fields(tmp_path: Path, monkeypatch) -> None:
+    service = AuthService(tmp_path / "auth.sqlite3", session_timeout_seconds=3600)
+    service.initialize_users(
+        admin_username="admin",
+        admin_password="admin-password",
+        user_username="reader",
+        user_password="reader-password",
+    )
+    monkeypatch.setattr(main, "auth_service", service)
+    monkeypatch.setattr(
+        main,
+        "settings",
+        replace(
+            main.settings,
+            auth_enabled=True,
+            auth_csrf_enabled=True,
+            auth_cookie_secure=False,
+            auth_cookie_name="test_admin_session",
+        ),
+    )
+
+    admin_client = TestClient(main.app)
+    admin_csrf = admin_client.get("/api/v1/auth/csrf").json()["token"]
+    admin_login = admin_client.post(
+        "/api/v1/auth/login",
+        json={"username": "admin", "password": "admin-password"},
+        headers={"X-XSRF-TOKEN": admin_csrf},
+    )
+    assert admin_login.status_code == 200
+
+    listed = admin_client.get("/api/v1/admin/users?size=20")
+    assert listed.status_code == 200
+    assert listed.json()["totalElements"] == 2
+    assert "password_hash" not in listed.text
+    assert "sessions" not in listed.text
+
+    registration = admin_client.get("/api/v1/admin/settings/registration")
+    assert registration.status_code == 200
+    assert registration.json()["enabled"] is True
+    registration_update = admin_client.patch(
+        "/api/v1/admin/settings/registration",
+        json={"enabled": False},
+        headers={"X-XSRF-TOKEN": admin_csrf},
+    )
+    assert registration_update.status_code == 200
+    assert registration_update.json()["enabled"] is False
+
+    created = admin_client.post(
+        "/api/v1/admin/users",
+        json={"username": "created-user", "password": "created-password", "role": "USER", "enabled": True},
+        headers={"X-XSRF-TOKEN": admin_csrf},
+    )
+    assert created.status_code == 201
+    created_id = created.json()["id"]
+    assert created.json()["role"] == "USER"
+
+    avatar = admin_client.put(
+        f"/api/v1/admin/users/{created_id}/avatar",
+        files={"avatar": ("avatar.png", b"\x89PNG\r\n\x1a\n", "image/png")},
+        headers={"X-XSRF-TOKEN": admin_csrf},
+    )
+    assert avatar.status_code == 200
+    assert avatar.json()["avatarUrl"]
+
+    updated = admin_client.patch(
+        f"/api/v1/admin/users/{created_id}",
+        json={"enabled": False},
+        headers={"X-XSRF-TOKEN": admin_csrf},
+    )
+    assert updated.status_code == 200
+    assert updated.json()["enabled"] is False
+
+    reader_client = TestClient(main.app)
+    reader_csrf = reader_client.get("/api/v1/auth/csrf").json()["token"]
+    reader_login = reader_client.post(
+        "/api/v1/auth/login",
+        json={"username": "reader", "password": "reader-password"},
+        headers={"X-XSRF-TOKEN": reader_csrf},
+    )
+    assert reader_login.status_code == 200
+    assert reader_client.get("/api/v1/admin/users").status_code == 403
+    assert reader_client.post(
+        "/api/v1/admin/users",
+        json={"username": "blocked", "password": "blocked-password", "role": "USER"},
+        headers={"X-XSRF-TOKEN": reader_csrf},
+    ).status_code == 403
 
 
 class FakeWikimediaResponse:
