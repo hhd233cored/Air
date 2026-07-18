@@ -887,8 +887,8 @@ function HomePage({ onPageChange, onOpenArticle, onOpenChatter, onOpenGuestbook,
               <p className="profile-bio">
                 大三、半传统派、喜欢摆烂、社恐到线上。爱好是打机、写歌、看书 <br />
                 主力：C++、C#<br />
-                比较擅长：Qt、Unity、Winform<br />
-                会一点：Postgress、Redis、LangGraph、Docker Compose、Godot、Spring Boot
+                比较擅长：Qt、LangGraph、Godot、FastAPI、Winform<br />
+                会一点：PostgreSQL、Redis、Docker Compose、Unity、Spring Boot、Next.js
               </p>
             </div>
           </div>

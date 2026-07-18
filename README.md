@@ -110,6 +110,7 @@ WantedBy=multi-user.target
 ```bash
 sudo systemctl daemon-reload
 sudo systemctl enable --now air-backend
+#sudo systemctl restart air-backend
 sudo systemctl status air-backend
 journalctl -u air-backend -f
 ```
