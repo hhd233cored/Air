@@ -1103,7 +1103,6 @@ function MarkdownContent({ source }: { source: string }) {
               event.currentTarget.src = imagePath;
             }}
           />
-          <figcaption>{image[1]}</figcaption>
         </figure>,
       );
       index += 1;
@@ -1629,7 +1628,7 @@ function SiteApp() {
             {authUser?.avatarUrl ? <img src={resolveApiUrl(authUser.avatarUrl)} alt="" /> : authUser ? <span className="header-auth-button__empty" aria-hidden="true" /> : null}
           </button>
           {authUser ? <span className="header-auth-label"><strong>{authUser.username}</strong><small>{authUser.role}</small></span> : null}
-          {authPanelOpen ? <AuthPanel user={authUser} onUserChange={setAuthUser} onClose={() => setAuthPanelOpen(false)} onOpenAdmin={() => { setAuthPanelOpen(false); window.location.assign("/admin/"); }} onOpenEditor={() => { setAuthPanelOpen(false); window.location.assign("/editor/"); }} /> : null}
+          {authPanelOpen ? <AuthPanel user={authUser} onUserChange={setAuthUser} onClose={() => setAuthPanelOpen(false)} onOpenAdmin={() => { setAuthPanelOpen(false); window.location.assign("/admin/"); }} onOpenMusic={() => { setAuthPanelOpen(false); window.location.assign("/admin/music/"); }} onOpenEditor={() => { setAuthPanelOpen(false); window.location.assign("/editor/"); }} /> : null}
           <button className="header-user-button" type="button" aria-label="用户账户" title="用户账户" />
         </div>
         </div>

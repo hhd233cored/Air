@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import base64
 import json
+import uuid
 from dataclasses import dataclass
 from pathlib import Path
 from urllib.parse import quote
@@ -46,6 +47,77 @@ class LocalMusicService:
             available=bool(tracks),
             message=None if tracks else "本地歌单暂时没有可播放歌曲",
         )
+
+    def add_track(self, filename: str, data: bytes) -> MusicPlaylistResponse:
+        """Store an uploaded audio file and add it to the local playlist."""
+
+        original_name = Path(filename or "").name
+        suffix = Path(original_name).suffix.lower()
+        if suffix not in self.allowed_audio_extensions:
+            allowed = ", ".join(sorted(self.allowed_audio_extensions))
+            raise MusicServiceError(
+                "LOCAL_MUSIC_UNSUPPORTED_FORMAT",
+                f"Only these audio formats are supported: {allowed}",
+                400,
+            )
+        if not data:
+            raise MusicServiceError("LOCAL_MUSIC_EMPTY_FILE", "Audio file is empty", 400)
+
+        display_name = Path(original_name).stem.strip() or "Uploaded song"
+        track_id = f"song-{uuid.uuid4().hex[:16]}"
+        self.content_dir.mkdir(parents=True, exist_ok=True)
+        target = self.content_dir / f"{track_id}{suffix}"
+        target.write_bytes(data)
+
+        try:
+            try:
+                playlist = self._read_playlist()
+            except MusicServiceError as error:
+                if error.code != "LOCAL_MUSIC_PLAYLIST_NOT_FOUND":
+                    raise
+                playlist = {"id": "local", "title": "Local playlist", "tracks": []}
+            raw_tracks = playlist.get("tracks", [])
+            if not isinstance(raw_tracks, list):
+                raise MusicServiceError("LOCAL_MUSIC_INVALID_PLAYLIST", "Playlist tracks must be an array", 502)
+            raw_tracks.append({"id": track_id, "name": display_name})
+            playlist["tracks"] = raw_tracks
+            self._write_playlist(playlist)
+        except Exception:
+            target.unlink(missing_ok=True)
+            raise
+
+        self._catalog_cache = None
+        return self.get_playlist()
+
+    def remove_track(self, track_id: str) -> MusicPlaylistResponse:
+        """Remove a playlist entry and delete its audio file when safe."""
+
+        track = self._find_track(track_id)
+        if track is None:
+            raise MusicServiceError("LOCAL_MUSIC_TRACK_NOT_FOUND", "Track does not exist in the local playlist", 404)
+
+        playlist = self._read_playlist()
+        raw_tracks = playlist.get("tracks", [])
+        if not isinstance(raw_tracks, list):
+            raise MusicServiceError("LOCAL_MUSIC_INVALID_PLAYLIST", "Playlist tracks must be an array", 502)
+        remaining = [
+            item for item in raw_tracks
+            if not isinstance(item, dict) or str(item.get("id") or "").strip() != track_id
+        ]
+        if len(remaining) == len(raw_tracks):
+            raise MusicServiceError("LOCAL_MUSIC_TRACK_NOT_FOUND", "Track does not exist in the local playlist", 404)
+
+        shared = any(item.id != track.id and item.path == track.path for item in self._get_catalog())
+        playlist["tracks"] = remaining
+        self._write_playlist(playlist)
+        if not shared:
+            try:
+                track.path.unlink(missing_ok=True)
+            except OSError as exc:
+                raise MusicServiceError("LOCAL_MUSIC_DELETE_FAILED", "Audio file could not be deleted", 500) from exc
+
+        self._catalog_cache = None
+        return self.get_playlist()
 
     def get_track_url(self, track_id: str) -> MusicTrackUrlResponse:
         track = self._find_track(track_id)
@@ -201,6 +273,19 @@ class LocalMusicService:
         if not isinstance(value, dict):
             raise MusicServiceError("LOCAL_MUSIC_INVALID_PLAYLIST", "本地歌单必须是 JSON 对象", 502)
         return value
+
+    def _write_playlist(self, playlist: dict[str, object]) -> None:
+        self.playlist_file.parent.mkdir(parents=True, exist_ok=True)
+        temporary = self.playlist_file.with_name(f".{self.playlist_file.name}.{uuid.uuid4().hex}.tmp")
+        try:
+            temporary.write_text(
+                json.dumps(playlist, ensure_ascii=False, indent=2) + "\n",
+                encoding="utf-8",
+            )
+            temporary.replace(self.playlist_file)
+        except OSError as exc:
+            temporary.unlink(missing_ok=True)
+            raise MusicServiceError("LOCAL_MUSIC_PLAYLIST_WRITE_FAILED", "Playlist could not be written", 500) from exc
 
     def _to_summary(self, track: LocalTrack) -> MusicTrackResponse:
         return MusicTrackResponse(

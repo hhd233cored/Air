@@ -8,11 +8,13 @@ import shutil
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any
+from typing import Any, Iterable
+
+from fastapi import UploadFile
 
 from .chatter_service import build_preview
 from .chatter_models import ChatterDetail, ChatterPageResponse, ChatterSummary
-from .editor_service import EditorArticleConflictError, EditorArticleNotFoundError, EditorError
+from .editor_service import ALLOWED_ASSET_EXTENSIONS, EditorArticleConflictError, EditorArticleNotFoundError, EditorError, _safe_filename
 from .markdown_io import read_markdown, write_markdown
 
 
@@ -74,13 +76,14 @@ class ChatterEditorService:
         entry = self._find_entry(slug)
         return ChatterDetail(**self._to_summary(entry).model_dump(), contentMarkdown=entry["contentMarkdown"])
 
-    def create_entry(
+    async def create_entry(
         self,
         *,
         slug: str | None,
         status: str | None,
         published_at: str | None,
         content_markdown: str,
+        assets: Iterable[UploadFile] = (),
     ) -> ChatterDetail:
         content = content_markdown or ""
         if not content.strip():
@@ -91,10 +94,11 @@ class ChatterEditorService:
             raise EditorArticleConflictError(clean_slug)
         metadata = self._make_metadata(clean_slug, status, published_at, None)
         self._write_entry(folder, metadata, content)
+        await self._save_assets(folder, assets)
         self.rebuild_index()
         return self.get_entry(clean_slug)
 
-    def update_entry(
+    async def update_entry(
         self,
         slug: str,
         *,
@@ -102,6 +106,7 @@ class ChatterEditorService:
         status: str | None,
         published_at: str | None,
         content_markdown: str,
+        assets: Iterable[UploadFile] = (),
     ) -> ChatterDetail:
         current = self._find_entry(slug)
         content = content_markdown or ""
@@ -118,6 +123,7 @@ class ChatterEditorService:
             folder.rename(target)
             folder = target
         self._write_entry(folder, metadata, content)
+        await self._save_assets(folder, assets)
         self.rebuild_index()
         return self.get_entry(clean_slug)
 
@@ -169,6 +175,28 @@ class ChatterEditorService:
         metadata_temp.write_text(json.dumps(metadata, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
         content_temp.replace(folder / "chatter.md")
         metadata_temp.replace(folder / "chatter.json")
+
+    async def _save_assets(self, folder: Path, assets: Iterable[UploadFile]) -> None:
+        asset_folder = folder / "assets"
+        for asset in assets:
+            if asset is not None and asset.filename:
+                asset_folder.mkdir(parents=True, exist_ok=True)
+                name = _safe_filename(asset.filename, ALLOWED_ASSET_EXTENSIONS)
+                await self._save_upload(asset, asset_folder / name, ALLOWED_ASSET_EXTENSIONS)
+
+    @staticmethod
+    async def _save_upload(upload: UploadFile, destination: Path, allowed: set[str]) -> None:
+        _safe_filename(upload.filename, allowed)
+        temporary = destination.with_name(f".{destination.name}.tmp-{uuid.uuid4().hex}")
+        try:
+            with temporary.open("wb") as output:
+                await upload.seek(0)
+                while chunk := await upload.read(1024 * 1024):
+                    output.write(chunk)
+            temporary.replace(destination)
+        finally:
+            if temporary.exists():
+                temporary.unlink()
 
     def _read_entries(self) -> list[dict[str, Any]]:
         entries: list[dict[str, Any]] = []

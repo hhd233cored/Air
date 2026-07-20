@@ -6,6 +6,7 @@ export type EditorChatterInput = {
   status: string;
   publishedAt: string;
   contentMarkdown: string;
+  assets?: File[];
 };
 
 export function getEditorChatter(page = 0, size = 100) {
@@ -22,6 +23,7 @@ export function saveEditorChatter(input: EditorChatterInput, existingSlug?: stri
   form.set("status", input.status);
   form.set("publishedAt", input.publishedAt);
   form.set("contentMarkdown", input.contentMarkdown);
+  for (const asset of input.assets ?? []) form.append("assets", asset, asset.name);
   const path = existingSlug ? `/editor/chatter/${encodeURIComponent(existingSlug)}` : "/editor/chatter";
   return editorRequest<ChatterDetail>(path, { method: existingSlug ? "PUT" : "POST", body: form });
 }

@@ -22,6 +22,9 @@ GET /api/v1/historical-today
 GET /api/v1/music/playlist
 GET /api/v1/music/tracks/{songId}/url
 GET /api/v1/music/tracks/{songId}/cover
+GET /api/v1/admin/music/tracks
+POST /api/v1/admin/music/tracks
+DELETE /api/v1/admin/music/tracks/{songId}
 ```
 
 ## Python 后端鉴权（SQLite）
@@ -65,6 +68,8 @@ public/chatter/life-changelog/
 ```env
 MUSIC_SOURCE=local
 MUSIC_CONTENT_DIR=./music
+# 管理员单次上传音乐的大小上限，默认 50 MiB
+MUSIC_MAX_UPLOAD_BYTES=52428800
 ```
 
 切换为网易云歌单：
@@ -74,6 +79,8 @@ MUSIC_SOURCE=netease
 ```
 
 本地音乐放在 `music/` 目录，歌单文件为 `music/playlist.json`。JSON 只保存歌曲 `id` 和 `name`，标题、作者、专辑、时长和内嵌封面由 `mutagen` 从音频文件读取。后端只返回歌曲元数据和音频 URL，音频文件由 `/music/` 静态路径提供。
+
+管理员登录后可以在 `/admin/` 的“音乐管理”区域上传或删除本地音乐。上传接口只在 `MUSIC_SOURCE=local` 时开放，文件会保存到 `MUSIC_CONTENT_DIR`，并自动更新 `playlist.json`。支持 `.mp3`、`.m4a`、`.aac`、`.wav`、`.ogg`、`.flac` 和 `.webm`；单文件大小受 `MUSIC_MAX_UPLOAD_BYTES` 限制。上传请求使用现有管理员 Session、CSRF 和管理员限流规则。
 
 接口路径和响应结构保持稳定，前端不需要修改 API 适配层。
 
@@ -272,6 +279,15 @@ npm.cmd run content:migrate
 CONTENT_STORAGE=database
 NEXT_PUBLIC_CONTENT_STORAGE=database
 ```
+
+Linux 服务器也可以直接执行：
+
+```bash
+bash scripts/migrate-content.sh --dry-run
+bash scripts/migrate-content.sh
+```
+
+脚本会读取项目根目录的 `.env`，优先使用 `backend-python/.venv/bin/python`，重复执行是安全的，不会删除原始文章、说说、封面或正文图片。
 
 切换后公开 API 和编辑器以 SQLite 为内容来源，不再从 Markdown 文件读取正文；原目录仍会保留，作为媒体文件和离线备份。切回 `files` 即可回到旧的文件读取模式。
 

@@ -134,6 +134,15 @@ npm.cmd run content:migrate
 
 迁移成功后再将 CONTENT_STORAGE 改为 database。原有 public/articles/ 和 public/chatter/ 文件会保留为备份。
 
+Linux 服务器上执行：
+
+~~~bash
+bash scripts/migrate-content.sh --dry-run
+bash scripts/migrate-content.sh
+~~~
+
+脚本会读取项目根目录的 .env，优先使用 backend-python/.venv/bin/python；迁移成功后再重启 Python 后端。
+
 文件模式的文章目录示例：
 
 ~~~text
@@ -170,6 +179,8 @@ GET /api/v1/guestbook
 ~~~
 
 评论、留言、鉴权、管理员账号管理和编辑器接口也由同一个 FastAPI 服务提供。公开读取接口不要求登录；写操作受 Session、CSRF、角色和限流保护。
+
+管理员登录后可在 `/admin/` 的“音乐管理”区域上传或删除本地音乐。上传功能要求 `MUSIC_SOURCE=local`，音频元数据和内嵌封面由后端读取，并自动更新 `music/playlist.json`。
 
 ## 常用命令
 

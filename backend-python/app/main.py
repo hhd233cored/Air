@@ -975,11 +975,12 @@ def get_editor_chatter(
 
 
 @app.post("/api/v1/editor/chatter", response_model=ChatterDetail, status_code=201)
-def create_editor_chatter(
+async def create_editor_chatter(
     slug: str | None = Form(default=None),
     status: str = Form(default="DRAFT"),
     publishedAt: str | None = Form(default=None),
     contentMarkdown: str = Form(default=""),
+    assets: list[UploadFile] | None = File(default=None),
     actor: UserRecord = Depends(require_editor_admin),
     __: None = Depends(require_csrf),
     ___: None = Depends(rate_limit_admin_ip),
@@ -990,21 +991,23 @@ def create_editor_chatter(
         settings.rate_limit_admin_max,
         settings.rate_limit_admin_window_seconds,
     )
-    return _get_editor_chatter_service().create_entry(
+    return await _get_editor_chatter_service().create_entry(
         slug=slug,
         status=status,
         published_at=publishedAt,
         content_markdown=contentMarkdown,
+        assets=assets or [],
     )
 
 
 @app.put("/api/v1/editor/chatter/{slug}", response_model=ChatterDetail)
-def update_editor_chatter(
+async def update_editor_chatter(
     slug: str,
     newSlug: str | None = Form(default=None),
     status: str | None = Form(default=None),
     publishedAt: str | None = Form(default=None),
     contentMarkdown: str = Form(default=""),
+    assets: list[UploadFile] | None = File(default=None),
     actor: UserRecord = Depends(require_editor_admin),
     __: None = Depends(require_csrf),
     ___: None = Depends(rate_limit_admin_ip),
@@ -1015,12 +1018,13 @@ def update_editor_chatter(
         settings.rate_limit_admin_max,
         settings.rate_limit_admin_window_seconds,
     )
-    return _get_editor_chatter_service().update_entry(
+    return await _get_editor_chatter_service().update_entry(
         slug,
         new_slug=newSlug,
         status=status,
         published_at=publishedAt,
         content_markdown=contentMarkdown,
+        assets=assets or [],
     )
 
 
@@ -1139,6 +1143,54 @@ def historical_today() -> HistoricalTodayResponse:
 @app.get("/api/v1/music/playlist", response_model=MusicPlaylistResponse)
 def music_playlist() -> MusicPlaylistResponse:
     return music_service.get_playlist()
+
+
+@app.get("/api/v1/admin/music/tracks", response_model=MusicPlaylistResponse)
+def admin_music_playlist(_: UserRecord = Depends(require_admin)) -> MusicPlaylistResponse:
+    if not isinstance(music_service, LocalMusicService):
+        raise MusicServiceError("LOCAL_MUSIC_SOURCE_REQUIRED", "Local music management is only available in local mode", 409)
+    return music_service.get_playlist()
+
+
+@app.post("/api/v1/admin/music/tracks", response_model=MusicPlaylistResponse, status_code=201)
+async def upload_admin_music(
+    audio: UploadFile = File(...),
+    actor: UserRecord = Depends(require_admin),
+    __: None = Depends(require_csrf),
+    ___: None = Depends(rate_limit_admin_ip),
+) -> MusicPlaylistResponse:
+    _check_user_rate(
+        actor,
+        "admin-music-upload",
+        settings.rate_limit_admin_max,
+        settings.rate_limit_admin_window_seconds,
+    )
+    if not isinstance(music_service, LocalMusicService):
+        raise MusicServiceError("LOCAL_MUSIC_SOURCE_REQUIRED", "Local music management is only available in local mode", 409)
+    data = await audio.read(settings.music_max_upload_bytes + 1)
+    if not data:
+        raise MusicServiceError("LOCAL_MUSIC_EMPTY_FILE", "Audio file is empty", 400)
+    if len(data) > settings.music_max_upload_bytes:
+        raise MusicServiceError("LOCAL_MUSIC_FILE_TOO_LARGE", "Audio file is too large", 413)
+    return music_service.add_track(audio.filename or "", data)
+
+
+@app.delete("/api/v1/admin/music/tracks/{track_id}", response_model=MusicPlaylistResponse)
+def delete_admin_music(
+    track_id: str,
+    actor: UserRecord = Depends(require_admin),
+    __: None = Depends(require_csrf),
+    ___: None = Depends(rate_limit_admin_ip),
+) -> MusicPlaylistResponse:
+    _check_user_rate(
+        actor,
+        "admin-music-delete",
+        settings.rate_limit_admin_max,
+        settings.rate_limit_admin_window_seconds,
+    )
+    if not isinstance(music_service, LocalMusicService):
+        raise MusicServiceError("LOCAL_MUSIC_SOURCE_REQUIRED", "Local music management is only available in local mode", 409)
+    return music_service.remove_track(track_id)
 
 
 @app.get("/api/v1/music/tracks/{track_id}/url", response_model=MusicTrackUrlResponse)

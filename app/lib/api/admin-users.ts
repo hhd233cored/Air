@@ -1,4 +1,5 @@
 import { authenticatedRequest } from "./auth";
+import type { MusicPlaylistPayload } from "./music";
 
 export type AdminUserRole = "USER" | "ADMIN";
 
@@ -94,5 +95,24 @@ export function updateRegistrationSetting(enabled: boolean) {
   return authenticatedRequest<RegistrationSetting>("/admin/settings/registration", {
     method: "PATCH",
     body: JSON.stringify({ enabled }),
+  });
+}
+
+export function getAdminMusicPlaylist() {
+  return authenticatedRequest<MusicPlaylistPayload>("/admin/music/tracks");
+}
+
+export function uploadAdminMusic(file: File) {
+  const body = new FormData();
+  body.append("audio", file, file.name);
+  return authenticatedRequest<MusicPlaylistPayload>("/admin/music/tracks", {
+    method: "POST",
+    body,
+  });
+}
+
+export function deleteAdminMusic(trackId: string) {
+  return authenticatedRequest<MusicPlaylistPayload>(`/admin/music/tracks/${encodeURIComponent(trackId)}`, {
+    method: "DELETE",
   });
 }

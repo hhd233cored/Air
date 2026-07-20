@@ -115,6 +115,7 @@ class Settings:
     chatter_content_dir: Path
     music_source: str
     music_content_dir: Path
+    music_max_upload_bytes: int
     cors_allowed_origins: tuple[str, ...]
     wikipedia_on_this_day_url: str
     netease_music_api_base_url: str
@@ -195,6 +196,7 @@ class Settings:
                 os.getenv("MUSIC_CONTENT_DIR", "./music"),
                 project_root,
             ),
+            music_max_upload_bytes=int(os.getenv("MUSIC_MAX_UPLOAD_BYTES", str(50 * 1024 * 1024))),
             cors_allowed_origins=origins,
             wikipedia_on_this_day_url=os.getenv(
                 "WIKIPEDIA_ON_THIS_DAY_URL",

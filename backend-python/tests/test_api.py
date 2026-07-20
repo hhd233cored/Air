@@ -527,3 +527,69 @@ def test_local_music_api_uses_the_same_frontend_contract(tmp_path: Path, monkeyp
     assert playlist.json()["source"] == "local"
     assert track_url.status_code == 200
     assert track_url.json()["playUrl"] == "/music/song.mp3"
+
+
+def test_local_music_service_can_add_and_remove_uploaded_track(tmp_path: Path, monkeypatch) -> None:
+    (tmp_path / "playlist.json").write_text(json.dumps({"tracks": []}), encoding="utf-8")
+    monkeypatch.setattr(local_music_module, "mutagen_file", lambda path, easy=False: None)
+    service = LocalMusicService(tmp_path)
+
+    uploaded = service.add_track("New song.mp3", b"audio-bytes")
+    assert len(uploaded.tracks) == 1
+    track_id = uploaded.tracks[0].id
+    assert (tmp_path / f"{track_id}.mp3").is_file()
+    assert json.loads((tmp_path / "playlist.json").read_text(encoding="utf-8"))["tracks"][0]["id"] == track_id
+
+    removed = service.remove_track(track_id)
+    assert removed.tracks == []
+    assert not (tmp_path / f"{track_id}.mp3").exists()
+
+
+def test_admin_music_upload_and_delete_requires_admin_and_csrf(tmp_path: Path, monkeypatch) -> None:
+    (tmp_path / "playlist.json").write_text(json.dumps({"tracks": []}), encoding="utf-8")
+    monkeypatch.setattr(local_music_module, "mutagen_file", lambda path, easy=False: None)
+    monkeypatch.setattr(main, "music_service", LocalMusicService(tmp_path))
+    service = AuthService(tmp_path / "auth.sqlite3", session_timeout_seconds=3600)
+    service.initialize_users(admin_username="admin", admin_password="admin-password")
+    monkeypatch.setattr(main, "auth_service", service)
+    monkeypatch.setattr(
+        main,
+        "settings",
+        replace(
+            main.settings,
+            auth_enabled=True,
+            auth_csrf_enabled=True,
+            auth_cookie_secure=False,
+            auth_cookie_name="test_music_session",
+            music_max_upload_bytes=1024,
+        ),
+    )
+    client = TestClient(main.app)
+    csrf = client.get("/api/v1/auth/csrf").json()["token"]
+    login = client.post(
+        "/api/v1/auth/login",
+        json={"username": "admin", "password": "admin-password"},
+        headers={"X-XSRF-TOKEN": csrf},
+    )
+    assert login.status_code == 200
+
+    missing_csrf = client.post(
+        "/api/v1/admin/music/tracks",
+        files={"audio": ("song.mp3", b"audio", "audio/mpeg")},
+    )
+    assert missing_csrf.status_code == 403
+
+    uploaded = client.post(
+        "/api/v1/admin/music/tracks",
+        files={"audio": ("song.mp3", b"audio", "audio/mpeg")},
+        headers={"X-XSRF-TOKEN": csrf},
+    )
+    assert uploaded.status_code == 201
+    track_id = uploaded.json()["tracks"][0]["id"]
+
+    deleted = client.delete(
+        f"/api/v1/admin/music/tracks/{track_id}",
+        headers={"X-XSRF-TOKEN": csrf},
+    )
+    assert deleted.status_code == 200
+    assert deleted.json()["tracks"] == []

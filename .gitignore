@@ -45,3 +45,10 @@ next-env.d.ts
 /backend-python/**/__pycache__/
 /backend-python/data/
 .pytest_cache/
+
+# 在线编辑和数据库运行时管理的内容。
+# 这些目录由服务器独立备份，不再随 Git 仓库发布。
+/public/articles/
+/public/chatter/
+/music/*
+!/music/README.md

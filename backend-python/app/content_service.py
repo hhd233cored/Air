@@ -570,7 +570,7 @@ class DatabaseChatterEditorService:
         summary = self._summary(row)
         return ChatterDetail(**summary.model_dump(), contentMarkdown=row["content_markdown"])
 
-    def create_entry(self, *, slug: str | None, status: str | None, published_at: str | None, content_markdown: str) -> ChatterDetail:
+    async def create_entry(self, *, slug: str | None, status: str | None, published_at: str | None, content_markdown: str, assets: Iterable[UploadFile] = ()) -> ChatterDetail:
         if not content_markdown.strip():
             raise EditorError("INVALID_CONTENT", "Chatter content is required")
         clean_slug = _normalize_slug(slug) if slug and slug.strip() else self._slug_from_content(content_markdown)
@@ -582,10 +582,11 @@ class DatabaseChatterEditorService:
         self.store.upsert(content_id=content_id, content_type=CHATTER, slug=clean_slug, title=None, summary=None, tags=[], content_markdown=content_markdown, cover_path=None, status=status_value, published_at=published, created_at=now, updated_at=now)
         folder = self.store.media_folder(CHATTER, clean_slug)
         folder.mkdir(parents=True, exist_ok=True)
+        await self._save_assets(folder, assets)
         self._write_backup(folder, {"id": content_id, "slug": clean_slug, "status": status_value, "publishedAt": published, "createdAt": now, "updatedAt": now}, content_markdown)
         return self.get_entry(clean_slug)
 
-    def update_entry(self, slug: str, *, new_slug: str | None, status: str | None, published_at: str | None, content_markdown: str) -> ChatterDetail:
+    async def update_entry(self, slug: str, *, new_slug: str | None, status: str | None, published_at: str | None, content_markdown: str, assets: Iterable[UploadFile] = ()) -> ChatterDetail:
         if not content_markdown.strip():
             raise EditorError("INVALID_CONTENT", "Chatter content is required")
         current = self.store.find(CHATTER, slug)
@@ -605,6 +606,7 @@ class DatabaseChatterEditorService:
             self.store.remove_slug_row(CHATTER, current_slug)
         folder = target if clean_slug != current_slug else old
         folder.mkdir(parents=True, exist_ok=True)
+        await self._save_assets(folder, assets)
         status_value, published = self._status(status, published_at, current)
         updated = _now()
         self.store.upsert(content_id=str(current["id"]), content_type=CHATTER, slug=clean_slug, title=None, summary=None, tags=[], content_markdown=content_markdown, cover_path=None, status=status_value, published_at=published, created_at=str(current["created_at"]), updated_at=updated)
@@ -627,6 +629,28 @@ class DatabaseChatterEditorService:
         if value == "PUBLISHED" and not published:
             published = (current["published_at"] if current is not None else None) or _now()
         return value, published
+
+    async def _save_assets(self, folder: Path, assets: Iterable[UploadFile]) -> None:
+        asset_folder = folder / "assets"
+        for asset in assets:
+            if asset is not None and asset.filename:
+                asset_folder.mkdir(parents=True, exist_ok=True)
+                name = _safe_filename(asset.filename, ALLOWED_ASSET_EXTENSIONS)
+                await self._save_upload(asset, asset_folder / name, ALLOWED_ASSET_EXTENSIONS)
+
+    @staticmethod
+    async def _save_upload(upload: UploadFile, destination: Path, allowed: set[str]) -> None:
+        _safe_filename(upload.filename, allowed)
+        temporary = destination.with_name(f".{destination.name}.tmp-{uuid.uuid4().hex}")
+        try:
+            with temporary.open("wb") as output:
+                await upload.seek(0)
+                while chunk := await upload.read(1024 * 1024):
+                    output.write(chunk)
+            temporary.replace(destination)
+        finally:
+            if temporary.exists():
+                temporary.unlink()
 
     @staticmethod
     def _slug_from_content(content: str) -> str:

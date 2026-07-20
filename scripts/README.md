@@ -61,3 +61,12 @@ npm.cmd run content:migrate
 ```
 
 迁移不会删除 `public/articles/` 和 `public/chatter/`，封面、正文图片及 Markdown 仍保留为备份。完成后在 `.env` 设置 `CONTENT_STORAGE=database` 和 `NEXT_PUBLIC_CONTENT_STORAGE=database`，需要回滚时改回 `files`。
+
+Linux 服务器使用：
+
+```bash
+bash scripts/migrate-content.sh --dry-run
+bash scripts/migrate-content.sh
+```
+
+脚本会从项目根目录读取 `.env`，使用同一个 `app.content_migration` 模块写入 SQLite，支持重复执行。

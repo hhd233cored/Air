@@ -117,7 +117,6 @@ export function MarkdownRenderer({ source }: { source: string }) {
               event.currentTarget.src = imagePath;
             }}
           />
-          <figcaption>{image[1]}</figcaption>
         </figure>,
       );
       index += 1;

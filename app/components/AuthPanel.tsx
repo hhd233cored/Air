@@ -11,6 +11,7 @@ type AuthPanelProps = {
   onUserChange: (user: AuthUser | null) => void;
   onClose: () => void;
   onOpenAdmin?: () => void;
+  onOpenMusic?: () => void;
   onOpenEditor?: () => void;
 };
 
@@ -20,7 +21,7 @@ function roleLabel(role: AuthUser["role"]) {
   return role === "ADMIN" ? "管理员" : "普通用户";
 }
 
-export function AuthPanel({ user, onUserChange, onClose, onOpenAdmin, onOpenEditor }: AuthPanelProps) {
+export function AuthPanel({ user, onUserChange, onClose, onOpenAdmin, onOpenMusic, onOpenEditor }: AuthPanelProps) {
   const [mode, setMode] = useState<AuthMode>("login");
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
@@ -120,6 +121,7 @@ export function AuthPanel({ user, onUserChange, onClose, onOpenAdmin, onOpenEdit
           </label>
           {user.avatarUrl ? <button className="auth-popover__switch" type="button" onClick={() => void removeAvatar()} disabled={avatarSubmitting}>删除头像</button> : null}
           {user.role === "ADMIN" && onOpenAdmin ? <button className="auth-popover__submit auth-popover__admin-link" type="button" onClick={onOpenAdmin}>账号管理</button> : null}
+          {user.role === "ADMIN" && onOpenMusic ? <button className="auth-popover__submit auth-popover__admin-link" type="button" onClick={onOpenMusic}>音乐管理</button> : null}
           {user.role === "ADMIN" && onOpenEditor ? <button className="auth-popover__submit auth-popover__admin-link" type="button" onClick={onOpenEditor}>文章编辑器</button> : null}
           <button className="auth-popover__submit" type="button" onClick={signOut} disabled={submitting}>
             {submitting ? "处理中…" : "退出登录"}
