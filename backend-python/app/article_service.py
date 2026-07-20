@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import Any
 
 from .models import ArticleDetail, ArticlePageResponse, ArticleSummary
+from .markdown_io import read_markdown
 
 logger = logging.getLogger(__name__)
 
@@ -62,8 +63,9 @@ class ArticleService:
     def __init__(self, articles_root: Path) -> None:
         self.articles_root = articles_root
 
-    def list_published(self, page: int, size: int, tag: str | None) -> ArticlePageResponse:
+    def list_published(self, page: int, size: int, tag: str | None, q: str | None = None) -> ArticlePageResponse:
         normalized_tag = _normalize_tag(tag)
+        normalized_query = q.strip().lower() if q and q.strip() else None
         articles = [
             article
             for article in self._read_metadata()
@@ -71,6 +73,10 @@ class ArticleService:
             and (
                 normalized_tag is None
                 or normalized_tag in {_normalize_tag(article_tag) for article_tag in article.tags}
+            )
+            and (
+                normalized_query is None
+                or normalized_query in "\n".join((article.title, article.summary or "", " ".join(article.tags), self._read_body_for_query(article))).lower()
             )
         ]
         articles.sort(
@@ -112,13 +118,25 @@ class ArticleService:
         if not self._is_inside(content_path, folder) or not content_path.is_file():
             raise ArticleNotFoundError(slug)
         try:
-            markdown = content_path.read_text(encoding="utf-8")
+            markdown = read_markdown(content_path)
         except OSError as exc:
             logger.warning("Could not read article content for %s: %s", slug, exc)
             raise ArticleNotFoundError(slug) from exc
 
         summary = self._to_summary(metadata)
         return ArticleDetail(**summary.model_dump(), contentMarkdown=markdown)
+
+    def _read_body_for_query(self, metadata: ArticleMetadata) -> str:
+        if not metadata.slug:
+            return ""
+        path = (self.articles_root / _normalize_slug(metadata.slug) / "article.md").resolve()
+        folder = (self.articles_root / _normalize_slug(metadata.slug)).resolve()
+        if not self._is_inside(path, folder) or not path.is_file():
+            return ""
+        try:
+            return read_markdown(path)
+        except OSError:
+            return ""
 
     def _read_metadata(self) -> list[ArticleMetadata]:
         if not self.articles_root.is_dir():

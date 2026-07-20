@@ -1,8 +1,0 @@
-spring:
-  config:
-    activate:
-      on-profile: local
-
-logging:
-  level:
-    com.yourspace: INFO

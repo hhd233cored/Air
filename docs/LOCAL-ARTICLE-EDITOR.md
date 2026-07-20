@@ -1,6 +1,6 @@
 # 本地网页文章编辑器
 
-编辑器只用于可信本机，不加入主导航，也不提供登录、Git 提交或发布按钮。它直接把文章写入 `public/articles/<slug>/`，线上只读 API 和生产部署不受影响。
+编辑器只用于可信本机，不加入主导航，也不提供 Git 提交或发布按钮。它已经整合到 Python 主后端，直接把文章写入 `public/articles/<slug>/`；生产启动脚本默认关闭编辑接口。
 
 ## 启动
 
@@ -15,17 +15,18 @@ backend-python\.venv\Scripts\python.exe -m pip install -r backend-python\require
 
 ```env
 NEXT_PUBLIC_EDITOR_ENABLED=true
-NEXT_PUBLIC_EDITOR_API_BASE_URL=http://localhost:8090
+NEXT_PUBLIC_API_BASE_URL=http://localhost:8080
+EDITOR_ENABLED=true
 ```
 
-然后分别启动前端和本地编辑 API：
+然后启动主后端和前端：
 
 ```powershell
+npm.cmd run backend:python
 npm.cmd run dev
-npm.cmd run editor:local
 ```
 
-浏览器打开 <http://localhost:3000/editor>。编辑 API 默认只监听 `127.0.0.1:8090`；如需调整端口，可设置 `EDITOR_SERVER_PORT`，不要把 `EDITOR_BIND_HOST` 改成公网地址。
+浏览器打开 <http://localhost:3000/editor/>。编辑器和公开 API 共用 `8080` 端口，不再需要单独启动 8090 编辑 API。
 
 ## 编辑和保存
 
@@ -50,7 +51,7 @@ public/articles/quiet-corner/
 
 ## API
 
-编辑 API 只在 `EDITOR_ENABLED=true` 时工作：
+编辑器接口只在 `EDITOR_ENABLED=true` 时工作：
 
 ```text
 GET  /api/v1/editor/articles
@@ -67,7 +68,7 @@ DELETE /api/v1/editor/chatter/{slug}
 
 ## 编辑器登录
 
-编辑接口需要管理员登录，写请求还需要 CSRF Token。编辑器仍然只绑定本机地址，不会因为开启鉴权而公开到公网。
+编辑接口需要管理员登录，写请求还需要 CSRF Token。编辑器是否开放由主后端的 `EDITOR_ENABLED` 控制；生产环境应保持关闭，或额外使用 Nginx/Cloudflare 访问控制。
 
 本地 `.env` 至少配置：
 
@@ -78,10 +79,9 @@ AUTH_ADMIN_PASSWORD=change-this-password
 EDITOR_ENABLED=true
 NEXT_PUBLIC_EDITOR_ENABLED=true
 NEXT_PUBLIC_API_BASE_URL=http://localhost:8080
-NEXT_PUBLIC_EDITOR_API_BASE_URL=http://localhost:8090
 ```
 
-先启动主 API，再启动编辑 API。打开主页，在导航栏登录管理员账号，然后访问 `http://localhost:3000/editor`。主 API 和编辑 API 必须使用相同主机名，不能一个使用 `localhost`、另一个使用 `127.0.0.1`，否则浏览器不会共享会话 Cookie。
+启动主 API 后，打开主页登录管理员账号，再访问 `http://localhost:3000/editor/`。编辑器与主 API 使用同一地址，因此 Session 和 CSRF Cookie 不需要跨端口共享。
 
 普通用户访问编辑接口返回 `403 AUTH_FORBIDDEN`，未登录访问返回 `401 AUTH_REQUIRED`。
 

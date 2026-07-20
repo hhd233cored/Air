@@ -1,4 +1,4 @@
-"""Public response models. Field names intentionally match the Java API."""
+"""Public response models with stable field names for the frontend API."""
 
 from __future__ import annotations
 

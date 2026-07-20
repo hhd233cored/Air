@@ -34,6 +34,16 @@ from .chatter_editor_service import ChatterEditorService
 from .comment_models import Comment, CommentCreateRequest, CommentPageResponse, CommentStatusRequest
 from .comment_service import CommentError, CommentService, TARGET_ARTICLE, TARGET_CHATTER
 from .config import Settings
+from .content_models import ContentSearchPageResponse
+from .content_service import (
+    ContentStorageError,
+    ContentStore,
+    DatabaseArticleEditorService,
+    DatabaseArticleService,
+    DatabaseChatterEditorService,
+    DatabaseChatterService,
+    to_search_page,
+)
 from .editor_models import EditorArticleDetail, EditorArticlePageResponse
 from .editor_service import ArticleEditorService, EditorError
 from .historical_service import HistoricalTodayService
@@ -46,8 +56,15 @@ from .rate_limit import InMemoryRateLimiter, RateLimitError, RateLimitRule
 
 
 settings = Settings.from_environment()
-article_service = ArticleService(settings.article_content_dir)
-chatter_service = ChatterService(settings.chatter_content_dir)
+if settings.content_storage not in {"files", "database"}:
+    raise ValueError("CONTENT_STORAGE must be 'files' or 'database'")
+content_store = (
+    ContentStore(settings.auth_database_path, settings.article_content_dir, settings.chatter_content_dir)
+    if settings.content_storage == "database"
+    else None
+)
+article_service = DatabaseArticleService(content_store) if content_store is not None else ArticleService(settings.article_content_dir)
+chatter_service = DatabaseChatterService(content_store) if content_store is not None else ChatterService(settings.chatter_content_dir)
 historical_service = HistoricalTodayService(settings.wikipedia_on_this_day_url)
 auth_service = (
     AuthService(settings.auth_database_path, settings.auth_session_timeout_seconds, settings.auth_registration_enabled)
@@ -58,8 +75,16 @@ rate_limiter = InMemoryRateLimiter(
     enabled=settings.rate_limit_enabled,
     max_keys=settings.rate_limit_max_keys,
 )
-editor_service = ArticleEditorService(settings.article_content_dir) if settings.editor_enabled else None
-chatter_editor_service = ChatterEditorService(settings.chatter_content_dir) if settings.editor_enabled else None
+editor_service = (
+    DatabaseArticleEditorService(content_store)
+    if settings.editor_enabled and content_store is not None
+    else ArticleEditorService(settings.article_content_dir) if settings.editor_enabled else None
+)
+chatter_editor_service = (
+    DatabaseChatterEditorService(content_store)
+    if settings.editor_enabled and content_store is not None
+    else ChatterEditorService(settings.chatter_content_dir) if settings.editor_enabled else None
+)
 comment_service = (
     CommentService(
         settings.auth_database_path,
@@ -98,6 +123,8 @@ async def lifespan(_: FastAPI):
 
 
 app = FastAPI(title="Your Space API", docs_url=None, redoc_url=None, lifespan=lifespan)
+app.mount("/articles", StaticFiles(directory=settings.article_content_dir), name="articles")
+app.mount("/chatter", StaticFiles(directory=settings.chatter_content_dir), name="chatter")
 app.mount("/music", StaticFiles(directory=settings.music_content_dir), name="music")
 app.add_middleware(
     CORSMiddleware,
@@ -157,6 +184,11 @@ async def music_error(request: Request, exception: MusicServiceError) -> JSONRes
 
 @app.exception_handler(EditorError)
 async def editor_error(request: Request, exception: EditorError) -> JSONResponse:
+    return _error_response(exception.status_code, exception.code, str(exception), request.url.path)
+
+
+@app.exception_handler(ContentStorageError)
+async def content_storage_error(request: Request, exception: ContentStorageError) -> JSONResponse:
     return _error_response(exception.status_code, exception.code, str(exception), request.url.path)
 
 
@@ -698,13 +730,28 @@ def list_articles(
     page: int = Query(default=0, ge=0),
     size: int = Query(default=10, ge=1, le=50),
     tag: str | None = Query(default=None),
+    q: str | None = Query(default=None, max_length=100),
 ) -> ArticlePageResponse:
-    return article_service.list_published(page, size, tag)
+    return article_service.list_published(page, size, tag, q)
 
 
 @app.get("/api/v1/articles/{slug}", response_model=ArticleDetail)
 def get_article(slug: str) -> ArticleDetail:
     return article_service.get_published(slug)
+
+
+@app.get("/api/v1/search", response_model=ContentSearchPageResponse)
+def search_content(
+    q: str = Query(..., min_length=1, max_length=100),
+    type: str = Query(default="ALL"),
+    page: int = Query(default=0, ge=0),
+    size: int = Query(default=10, ge=1, le=50),
+) -> ContentSearchPageResponse:
+    if content_store is None:
+        raise ContentStorageError("CONTENT_STORAGE_DATABASE_REQUIRED", "Search requires CONTENT_STORAGE=database", 503)
+    if not q.strip():
+        raise ContentStorageError("CONTENT_EMPTY_QUERY", "Search query cannot be empty", 400)
+    return to_search_page(content_store, q, type, page, size)
 
 
 def _get_comment_service() -> CommentService:
@@ -802,9 +849,10 @@ def _get_editor_service() -> ArticleEditorService:
 def list_editor_articles(
     page: int = Query(default=0, ge=0),
     size: int = Query(default=20, ge=1, le=100),
+    q: str | None = Query(default=None, max_length=100),
     _: UserRecord = Depends(require_editor_admin),
 ) -> EditorArticlePageResponse:
-    return _get_editor_service().list_articles(page, size)
+    return _get_editor_service().list_articles(page, size, q)
 
 
 @app.get("/api/v1/editor/articles/{slug}", response_model=EditorArticleDetail)
@@ -912,9 +960,10 @@ def _get_editor_chatter_service() -> ChatterEditorService:
 def list_editor_chatter(
     page: int = Query(default=0, ge=0),
     size: int = Query(default=50, ge=1, le=100),
+    q: str | None = Query(default=None, max_length=100),
     _: UserRecord = Depends(require_editor_admin),
 ) -> ChatterPageResponse:
-    return _get_editor_chatter_service().list_entries(page, size)
+    return _get_editor_chatter_service().list_entries(page, size, q)
 
 
 @app.get("/api/v1/editor/chatter/{slug}", response_model=ChatterDetail)
@@ -996,8 +1045,9 @@ def delete_editor_chatter(
 def list_chatter(
     page: int = Query(default=0, ge=0),
     size: int = Query(default=10, ge=1, le=50),
+    q: str | None = Query(default=None, max_length=100),
 ) -> ChatterPageResponse:
-    return chatter_service.list_published(page, size)
+    return chatter_service.list_published(page, size, q)
 
 
 @app.get("/api/v1/chatter/{slug}", response_model=ChatterDetail)

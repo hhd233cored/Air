@@ -22,11 +22,14 @@ export type ChatterPageResponse = {
   totalPages: number;
 };
 
+export const usesDatabaseContent = process.env.NEXT_PUBLIC_CONTENT_STORAGE === "database";
+
 const localChatterCache: { value: ChatterSummary[]; expiresAt: number } = { value: [], expiresAt: 0 };
 let localChatterRequest: Promise<ChatterSummary[]> | null = null;
 
-export function getChatterEntries(page = 0, size = 50) {
+export function getChatterEntries(page = 0, size = 50, q?: string) {
   const params = new URLSearchParams({ page: String(page), size: String(size) });
+  if (q) params.set("q", q);
   return apiGet<ChatterPageResponse>(`/chatter?${params.toString()}`);
 }
 

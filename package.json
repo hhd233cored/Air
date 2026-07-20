@@ -11,15 +11,12 @@
     "start": "vinext start",
     "test": "npm run build && node --test tests/rendered-html.test.mjs",
     "lint": "eslint . --ignore-pattern dist --ignore-pattern .next",
-    "backend:local": "powershell -ExecutionPolicy Bypass -File backend/run-local.ps1",
     "backend:python": "powershell -ExecutionPolicy Bypass -File backend-python/run-local.ps1",
-    "editor:local": "powershell -ExecutionPolicy Bypass -File backend-python/run-editor.ps1",
-    "backend:package": "mvn -f backend/pom.xml -DskipTests package",
-    "backend:prod": "powershell -ExecutionPolicy Bypass -File backend/run-prod.ps1",
+    "editor:local": "powershell -ExecutionPolicy Bypass -File backend-python/run-local.ps1",
     "backend:python:prod": "powershell -ExecutionPolicy Bypass -File backend-python/run-prod.ps1",
-    "backend:test": "mvn -f backend/pom.xml test",
     "articles:export": "powershell -ExecutionPolicy Bypass -File scripts/export-articles.ps1",
-    "articles:import": "powershell -ExecutionPolicy Bypass -File scripts/import-articles.ps1"
+    "articles:import": "powershell -ExecutionPolicy Bypass -File scripts/import-articles.ps1",
+    "content:migrate": "powershell -ExecutionPolicy Bypass -File scripts/migrate-content.ps1"
   },
   "dependencies": {
     "next": "16.2.6",

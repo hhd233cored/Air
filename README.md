@@ -1,71 +1,102 @@
-# Your Space
+# AirChord
 
-本地文章编辑器说明见 [`docs/LOCAL-ARTICLE-EDITOR.md`](docs/LOCAL-ARTICLE-EDITOR.md)。它默认关闭，只在本机通过 `npm.cmd run editor:local` 启用。
-
-这是一个轻量化个人博客，包含 vinext 前端和只读 API。项目同时保留 Java Spring Boot 版本，并新增了资源占用更低的 FastAPI Python 版本。
+AirChord 是一个轻量化个人博客，包含 vinext 静态前端和 FastAPI Python 后端。后端使用单进程运行，文章、说说和鉴权数据使用 SQLite，媒体文件保留在项目目录中。
 
 ## 环境要求
 
-- Node.js `>=22.13.0`
-- Java 21
-- Maven 3.9+（仅本地开发和打包需要）
-- Python 3.11+（使用 Python API 时需要）
+- Node.js >=22.13.0
+- Python 3.11+
 
-生产服务器不需要 Docker、PostgreSQL 或 Node.js 开发服务。
+服务器运行时只需要 Python；Node.js 仅用于本地前端开发和生成静态文件。
 
 ## 本地启动
 
 安装前端依赖：
 
-```powershell
+~~~powershell
 npm.cmd install
-```
-
-启动只读 Java API：
-
-```powershell
-npm.cmd run backend:local
-```
-
-启动只读 Python API：
-
-```powershell
-npm.cmd run backend:python
-```
-
-Python API 使用 FastAPI，默认监听 `http://localhost:8080`。如果需要从局域网访问，可以先设置：
-
-```powershell
-$env:PYTHON_HOST = "0.0.0.0"
-npm.cmd run backend:python
-```
-
-另开终端启动前端：
-
-```powershell
-npm.cmd run dev
-```
-
-前端默认地址为 `http://localhost:3000`，后端默认地址为 `http://localhost:8080`。
-
-网易云音乐播放器使用 Python 后端的代理接口。请将 `.env.example` 中的 `NETEASE_MUSIC_*` 配置复制到本地 `.env` 并填写网易云 OpenAPI 应用参数，然后使用 `npm.cmd run backend:python` 启动后端；前端会自动读取歌单，点击播放时再获取临时播放地址。官方 OpenAPI 的密钥只放在后端环境变量中，不放入前端。
-
-## Linux 启动
-
-生产服务器建议只运行 Python API，前端使用静态文件托管。服务器不需要安装 Node.js、Maven、Java、Docker 或 PostgreSQL。
-
-首次部署：
-
-```bash
-cd /opt/air
-cp .env.example .env
-nano .env
-bash backend-python/install-linux.sh
-```
+~~~
 
 启动 Python 后端：
 
-```bash
+~~~powershell
+npm.cmd run backend:python
+~~~
+
+启动前端开发服务：
+
+~~~powershell
+npm.cmd run dev
+~~~
+
+- 前端：http://localhost:3000
+- 后端：http://localhost:8080
+
+如果需要在局域网访问后端：
+
+~~~powershell
+$env:PYTHON_HOST = "0.0.0.0"
+npm.cmd run backend:python
+~~~
+
+## 配置
+
+复制 .env.example 为 .env，按需修改：
+
+~~~env
+SERVER_PORT=8080
+ARTICLE_CONTENT_DIR=./public/articles
+CHATTER_CONTENT_DIR=./public/chatter
+CONTENT_STORAGE=database
+NEXT_PUBLIC_CONTENT_STORAGE=database
+NEXT_PUBLIC_API_BASE_URL=http://localhost:8080
+~~~
+
+首次启动鉴权时，会根据 .env 中的管理员和普通用户配置创建账号。密码只保存为 Argon2id 哈希；生产环境请修改默认密码，并且不要提交 .env 或 backend-python/data/。
+
+编辑器仅用于本机：
+
+~~~env
+EDITOR_ENABLED=true
+NEXT_PUBLIC_EDITOR_ENABLED=true
+~~~
+
+生产环境应保持编辑器关闭。
+
+## 生产部署
+
+### 静态前端
+
+构建静态文件：
+
+~~~powershell
+npm.cmd run build
+~~~
+
+静态文件位于：
+
+~~~text
+dist/client/
+~~~
+
+可以将 dist/client/ 部署到 Cloudflare Pages、Nginx 或其它静态托管服务。Cloudflare Pages 的构建配置通常为：
+
+- 构建命令：npm run build
+- 输出目录：dist/client
+- 环境变量：NEXT_PUBLIC_API_BASE_URL=https://你的后端域名
+
+### Python 后端
+
+Linux 首次安装：
+
+~~~bash
+cd /opt/air
+bash backend-python/install-linux.sh
+~~~
+
+启动：
+
+~~~bash
 cd /opt/air
 set -a
 . ./.env
@@ -73,192 +104,90 @@ set +a
 backend-python/.venv/bin/uvicorn app.main:app \
   --app-dir backend-python \
   --host 127.0.0.1 \
-  --port "${SERVER_PORT:-8080}" \
+  --port "$SERVER_PORT" \
   --workers 1
-```
+~~~
 
-测试接口：
+也可以使用：
 
-```bash
-curl http://127.0.0.1:8080/api/v1/health
-curl http://127.0.0.1:8080/api/v1/articles
-curl http://127.0.0.1:8080/api/v1/chatter
-curl http://127.0.0.1:8080/api/v1/historical-today
-```
+~~~bash
+npm.cmd run backend:python:prod
+~~~
 
-也可以使用 systemd 托管后端，创建 `/etc/systemd/system/air-backend.service`：
+生产环境建议使用 systemd 管理进程，并由 Nginx 或 Cloudflare 将 /api 和 /music 转发到后端。
 
-```ini
-[Unit]
-Description=Air lightweight Python API
-After=network.target
+## 文章和说说
 
-[Service]
-Type=simple
-WorkingDirectory=/opt/air
-EnvironmentFile=/opt/air/.env
-ExecStart=/opt/air/backend-python/.venv/bin/uvicorn app.main:app --app-dir /opt/air/backend-python --host 127.0.0.1 --port 8080 --workers 1
-Restart=always
-RestartSec=3
+默认推荐使用数据库模式：
 
-[Install]
-WantedBy=multi-user.target
-```
+~~~env
+CONTENT_STORAGE=database
+NEXT_PUBLIC_CONTENT_STORAGE=database
+~~~
 
-启用并查看日志：
+文章和说说正文保存在现有 SQLite 数据库的 content_items 表中，FTS5 用于搜索；封面图、正文图片和音乐文件仍保存在文件系统中。数据库迁移前可以使用文件模式：
 
-```bash
-sudo systemctl daemon-reload
-sudo systemctl enable --now air-backend
-#sudo systemctl restart air-backend
-sudo systemctl status air-backend
-journalctl -u air-backend -f
-```
+~~~powershell
+npm.cmd run content:migrate -- -DryRun
+npm.cmd run content:migrate
+~~~
 
-## 静态前端部署
+迁移成功后再将 CONTENT_STORAGE 改为 database。原有 public/articles/ 和 public/chatter/ 文件会保留为备份。
 
-当前前端主要由浏览器执行页面切换、轮播图、播放器和 API 请求，适合静态部署。静态部署前端后，服务器不需要运行 `npm run dev` 或 `vinext start`，可以减少服务器内存占用。
+文件模式的文章目录示例：
 
-项目已经在 [next.config.ts](next.config.ts) 中启用静态导出：
-
-```ts
-import type { NextConfig } from "next";
-
-const nextConfig: NextConfig = {
-  output: "export",
-  trailingSlash: true,
-};
-
-export default nextConfig;
-```
-
-在构建机器上配置生产 API 地址。若前端和后端使用同一个域名，推荐使用相对路径：
-
-```env
-NEXT_PUBLIC_API_BASE_URL=
-```
-
-如果前后端使用不同域名，则填写后端地址：
-
-```env
-NEXT_PUBLIC_API_BASE_URL=https://api.example.com
-```
-
-然后构建：
-
-```bash
-npm install
-npm run build
-```
-
-项目的 `build` 命令会自动使用静态导出模式。Windows 下如果 vinext 在构建完成后输出 Node/libuv 清理断言，构建脚本会在确认 `dist/client/index.html` 已生成后将其视为可忽略的清理问题。
-
-静态文件通常位于：
-
-```text
-dist/client/
-```
-
-该目录应包含 `index.html`、`assets/`、`articles/` 和 `chatter/`。构建机器需要 Node.js，但部署静态文件的服务器不需要 Node.js。
-
-本地预览静态文件：
-
-```bash
-python3 -m http.server 3000 --directory dist/client
-```
-
-### Nginx 配置
-
-将 `dist/client/` 上传到服务器，例如 `/var/www/air/dist/client`，然后配置：
-
-```nginx
-server {
-    listen 80;
-    server_name example.com;
-
-    root /var/www/air/dist/client;
-    index index.html;
-
-    location / {
-        try_files $uri $uri/ /index.html;
-    }
-
-    location /api/ {
-        proxy_pass http://127.0.0.1:8080;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-    }
-
-    location /music/ {
-        proxy_pass http://127.0.0.1:8080;
-        proxy_set_header Host $host;
-    }
-}
-```
-
-修改配置后检查并重载 Nginx：
-
-```bash
-sudo nginx -t
-sudo systemctl reload nginx
-```
-
-如果使用 Cloudflare Pages，构建命令填写 `npm run build`，输出目录填写 `dist/client`；`NEXT_PUBLIC_API_BASE_URL` 需要在 Cloudflare Pages 的环境变量中配置。
-
-## 生产打包
-
-```powershell
-npm.cmd run backend:package
-npm.cmd run backend:prod
-```
-
-生产启动脚本会使用受限 JVM 内存：`Xmx256m`。服务器只需要 Java 21 JRE 和 `public/` 文章目录。
-
-## 项目结构
-
-- `app/`：前端页面、组件和样式
-- `public/articles/`：每篇文章的独立目录
-- `music/`：本地音乐文件和 `playlist.json` 歌单
-- `backend/`：只读 Java API
-- `backend-python/`：只读 FastAPI Python API
-- `scripts/`：文章目录导入导出脚本
-- `worker/`：Cloudflare Worker 托管入口
-- `legacy/`：旧数据库、鉴权和 Docker 方案，仅作归档
-
-## 文章结构
-
-```text
+~~~text
 public/articles/first-note/
   article.json
   article.md
-  cover.svg
+  cover.webp
   assets/
-```
+~~~
 
-文章列表使用自动生成的 `public/articles/index.json`。正文使用 Markdown，封面支持 SVG、PNG、JPG/JPEG 和 WebP。
+## 编辑器
+
+编辑器页面为 /editor/，不加入公共导航。它和 Python 后端共用 8080 端口，需要管理员登录：
+
+~~~powershell
+npm.cmd run backend:python
+npm.cmd run dev
+~~~
+
+管理员账号登录后访问 http://localhost:3000/editor/。数据库模式下编辑器直接修改 SQLite 内容表，同时保留媒体文件和 Markdown 备份。
+
+## 主要 API
+
+~~~text
+GET /api/v1/health
+GET /api/v1/articles
+GET /api/v1/articles/{slug}
+GET /api/v1/chatter
+GET /api/v1/chatter/{slug}
+GET /api/v1/search?q=关键词&type=ALL
+GET /api/v1/historical-today
+GET /api/v1/music/playlist
+GET /api/v1/guestbook
+~~~
+
+评论、留言、鉴权、管理员账号管理和编辑器接口也由同一个 FastAPI 服务提供。公开读取接口不要求登录；写操作受 Session、CSRF、角色和限流保护。
 
 ## 常用命令
 
-```powershell
-npm.cmd run dev              # 前端开发服务器
-npm.cmd run build            # 前端构建
-npm.cmd test                 # 前端测试
-npm.cmd run backend:local    # 本地启动 Java API
-npm.cmd run backend:python   # 本地启动 Python API
-npm.cmd run backend:package  # 打包 Java JAR
-npm.cmd run backend:test     # 后端测试
-npm.cmd run articles:export  # 导出文章目录
-npm.cmd run articles:import  # 导入文章目录
-```
+~~~powershell
+npm.cmd run dev
+npm.cmd run build
+npm.cmd test
+npm.cmd run lint
+npm.cmd run backend:python
+npm.cmd run backend:python:prod
+npm.cmd run content:migrate
+npm.cmd run articles:export
+npm.cmd run articles:import
+~~~
 
-音乐来源默认使用本地歌单。修改根目录 `.env` 中的 `MUSIC_SOURCE`：
+详细说明：
 
-```env
-MUSIC_SOURCE=local       # 使用 music/playlist.json
-MUSIC_SOURCE=netease     # 使用网易云 OpenAPI
-```
-
-本地歌单格式和音频文件放置方式见 `music/README.md`。切换配置后需要重启 Python 后端。
-
-详细说明请查看 [`backend/README.md`](backend/README.md) 和 [`scripts/README.md`](scripts/README.md)。
+- Python 后端说明：backend-python/README.md
+- 本地文章编辑器：docs/LOCAL-ARTICLE-EDITOR.md
+- 文章导入导出：scripts/README.md
+- 本地音乐：music/README.md

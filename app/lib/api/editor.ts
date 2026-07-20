@@ -17,45 +17,9 @@ export type EditorArticleInput = {
   assets?: File[];
 };
 
-function isLocalHost(hostname: string) {
-  return hostname === "localhost" || hostname === "127.0.0.1" || hostname === "[::1]" || hostname === "::1";
-}
-
-function getDefaultEditorApiBase() {
-  if (!apiBaseUrl) return "http://localhost:8090";
-  try {
-    const url = new URL(apiBaseUrl);
-    if (isLocalHost(url.hostname)) {
-      url.port = "8090";
-    }
-    return url.toString().replace(/\/$/, "");
-  } catch {
-    return "http://localhost:8090";
-  }
-}
-
-function getEditorApiBase() {
-  const configured = process.env.NEXT_PUBLIC_EDITOR_API_BASE_URL;
-  if (!configured) return getDefaultEditorApiBase();
-
-  try {
-    const editorUrl = new URL(configured);
-    if (apiBaseUrl) {
-      const mainUrl = new URL(apiBaseUrl);
-      // localhost and 127.0.0.1 are different cookie hosts. Keep the editor
-      // service on the same local hostname as the main API so its session is
-      // available when the editor is opened from the browser.
-      if (isLocalHost(mainUrl.hostname) && isLocalHost(editorUrl.hostname)) {
-        editorUrl.hostname = mainUrl.hostname;
-      }
-    }
-    return editorUrl.toString().replace(/\/$/, "");
-  } catch {
-    return configured.replace(/\/$/, "");
-  }
-}
-
-const editorApiBase = getEditorApiBase();
+// The editor is served by the same FastAPI process as the public API. Keeping
+// one origin also makes the Session and CSRF cookies available to the editor.
+const editorApiBase = (apiBaseUrl || "http://localhost:8080").replace(/\/$/, "");
 
 type EditorAuthUserResponse = { user: AuthUser };
 

@@ -109,6 +109,7 @@ class Settings:
     trusted_proxy_ips: tuple[str, ...]
     comments_enabled: bool
     comments_max_length: int
+    content_storage: str
     editor_enabled: bool
     article_content_dir: Path
     chatter_content_dir: Path
@@ -179,6 +180,7 @@ class Settings:
             trusted_proxy_ips=_csv(os.getenv("TRUSTED_PROXY_IPS", "127.0.0.1")),
             comments_enabled=_boolean("COMMENTS_ENABLED", True),
             comments_max_length=int(os.getenv("COMMENTS_MAX_LENGTH", "1000")),
+            content_storage=os.getenv("CONTENT_STORAGE", "files").strip().lower() or "files",
             editor_enabled=_boolean("EDITOR_ENABLED"),
             article_content_dir=_resolve_path(
                 os.getenv("ARTICLE_CONTENT_DIR", "./public/articles"),

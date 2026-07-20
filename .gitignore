@@ -41,8 +41,6 @@ next-env.d.ts
 /.wrangler/
 /outputs/
 /work/
-/backend/target/
-/backend/data/
 /backend-python/.venv/
 /backend-python/**/__pycache__/
 /backend-python/data/

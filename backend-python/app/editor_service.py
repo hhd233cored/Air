@@ -17,6 +17,7 @@ from typing import Any, Iterable
 from fastapi import UploadFile
 
 from .editor_models import EditorArticleDetail, EditorArticlePageResponse, EditorArticleSummary
+from .markdown_io import read_markdown, write_markdown
 
 
 ALLOWED_COVER_EXTENSIONS = {".svg", ".png", ".jpg", ".jpeg", ".webp"}
@@ -100,8 +101,13 @@ class ArticleEditorService:
         self.articles_root = articles_root.resolve()
         self.articles_root.mkdir(parents=True, exist_ok=True)
 
-    def list_articles(self, page: int, size: int) -> EditorArticlePageResponse:
-        articles = sorted(self._read_metadata(), key=self._sort_key, reverse=True)
+    def list_articles(self, page: int, size: int, q: str | None = None) -> EditorArticlePageResponse:
+        normalized_query = q.strip().lower() if q and q.strip() else None
+        articles = [
+            item for item in self._read_metadata()
+            if normalized_query is None or normalized_query in "\n".join((str(item.get("title") or ""), str(item.get("summary") or ""), " ".join(str(tag) for tag in item.get("tags") or []))).lower()
+        ]
+        articles = sorted(articles, key=self._sort_key, reverse=True)
         start = min(page * size, len(articles))
         end = min(start + size, len(articles))
         total_pages = 0 if not articles else (len(articles) + size - 1) // size
@@ -120,7 +126,7 @@ class ArticleEditorService:
         if not content_path.is_file():
             raise EditorArticleNotFoundError(slug)
         try:
-            markdown = content_path.read_text(encoding="utf-8")
+            markdown = read_markdown(content_path)
         except OSError as exc:
             raise EditorArticleNotFoundError(slug) from exc
         return EditorArticleDetail(**self._to_summary(metadata).model_dump(), contentMarkdown=markdown)
@@ -285,7 +291,7 @@ class ArticleEditorService:
         metadata_path = folder / "article.json"
         markdown_temp = folder / f"article.md.tmp-{uuid.uuid4().hex}"
         metadata_temp = folder / f"article.json.tmp-{uuid.uuid4().hex}"
-        markdown_temp.write_text(content_markdown or "", encoding="utf-8")
+        write_markdown(markdown_temp, content_markdown)
         metadata_temp.write_text(json.dumps(metadata, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
         markdown_temp.replace(markdown_path)
         metadata_temp.replace(metadata_path)

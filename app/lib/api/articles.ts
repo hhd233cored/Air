@@ -25,6 +25,8 @@ export type ArticlePageResponse = {
   totalPages: number;
 };
 
+export const usesDatabaseContent = process.env.NEXT_PUBLIC_CONTENT_STORAGE === "database";
+
 type ArticleRequest = {
   signal: AbortSignal;
   promise: Promise<ArticleDetail>;
@@ -51,9 +53,10 @@ export function isAbortError(error: unknown) {
   return error instanceof Error && error.name === "AbortError";
 }
 
-export function getPublishedArticles(page = 0, size = 3, tag?: string) {
+export function getPublishedArticles(page = 0, size = 3, tag?: string, q?: string) {
   const params = new URLSearchParams({ page: String(page), size: String(size) });
   if (tag) params.set("tag", tag);
+  if (q) params.set("q", q);
   return apiGet<ArticlePageResponse>(`/articles?${params.toString()}`);
 }
 
@@ -83,12 +86,12 @@ export function getPublishedArticle(slug: string, signal?: AbortSignal) {
   return promise;
 }
 
-export async function getAllPublishedArticles(pageSize = 50) {
+export async function getAllPublishedArticles(pageSize = 50, q?: string) {
   const articles: ArticleSummary[] = [];
   let page = 0;
 
   while (true) {
-    const response = await getPublishedArticles(page, pageSize);
+    const response = await getPublishedArticles(page, pageSize, undefined, q);
     articles.push(...response.content);
     if (page + 1 >= response.totalPages || response.content.length === 0) break;
     page += 1;

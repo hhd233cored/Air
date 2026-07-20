@@ -2,8 +2,8 @@
 
 import { type ReactNode, useCallback, useEffect, useRef, useState } from "react";
 import { resolveApiUrl } from "./lib/api/client";
-import { type ArticleSummary, getAllPublishedArticles, getLocalArticleDetail, getLocalArticleIndex, getPublishedArticle, getPublishedArticles, isAbortError } from "./lib/api/articles";
-import { getChatterEntries, getChatterEntry, getLocalChatterEntry, getLocalChatterIndex, type ChatterSummary } from "./lib/api/chatter";
+import { type ArticleSummary, getAllPublishedArticles, getLocalArticleDetail, getLocalArticleIndex, getPublishedArticle, getPublishedArticles, isAbortError, usesDatabaseContent as usesDatabaseArticleContent } from "./lib/api/articles";
+import { getChatterEntries, getChatterEntry, getLocalChatterEntry, getLocalChatterIndex, type ChatterSummary, usesDatabaseContent as usesDatabaseChatterContent } from "./lib/api/chatter";
 import { type HistoricalTodayEvent, getHistoricalToday } from "./lib/api/historical";
 import { getMusicPlaylist, getMusicTrackUrl, type MusicTrackSummary } from "./lib/api/music";
 import { type AuthUser, getCurrentUser } from "./lib/api/auth";
@@ -34,7 +34,7 @@ const fallbackArticleList: ArticleSummary[] = [
     id: "fallback-first-note",
     slug: "first-note",
     title: "First note",
-    summary: "The first sample article served by the Java API.",
+    summary: "The first sample article served by the lightweight API.",
     coverUrl: "/articles/first-note/cover.svg",
     tags: ["notes"],
     status: "PUBLISHED",
@@ -779,7 +779,7 @@ function HomeArticleCard({ article, onOpenArticle }: { article: ArticleSummary; 
     >
       {article.coverUrl ? (
         <>
-          <img className="article-list-card__cover" src={article.coverUrl} alt="" loading="eager" decoding="async" />
+          <img className="article-list-card__cover" src={resolveApiUrl(article.coverUrl)} alt="" loading="eager" decoding="async" />
           <div className="article-list-card__mask">
             <h2 className="article-list-card__mask-title">{article.title}</h2>
             <div className="article-list-card__preview" aria-live="polite"><div className="article-list-card__preview-copy">{isHovered ? (previewLoading ? <span>正在读取正文…</span> : previewLines.map((line, lineIndex) => <span key={`${article.slug}-home-preview-${lineIndex}`}>{line}</span>)) : null}</div></div>
@@ -805,12 +805,13 @@ function HomePage({ onPageChange, onOpenArticle, onOpenChatter, onOpenGuestbook,
         if (!cancelled) setLatestArticles(result.content);
       })
       .catch(() => {
+        if (usesDatabaseArticleContent) return;
         getLocalArticleIndex()
           .then((result) => {
             if (!cancelled) setLatestArticles(result.slice(0, 3));
           })
           .catch(() => {
-            // Keep the bundled sample post when the Java API and local index are unavailable.
+            // Keep the bundled sample post when the API and local index are unavailable.
           });
       });
 
@@ -856,6 +857,10 @@ function HomePage({ onPageChange, onOpenArticle, onOpenChatter, onOpenGuestbook,
         if (!cancelled) setChatterEntries(result.content.slice(0, 3));
       })
       .catch(() => {
+        if (usesDatabaseChatterContent) {
+          if (!cancelled) setStatus("error");
+          return;
+        }
         getLocalChatterIndex()
           .then((result) => {
             if (!cancelled) setChatterEntries(result.slice(0, 3));
@@ -1007,7 +1012,7 @@ function renderInlineMarkdown(text: string): ReactNode[] {
 }
 
 function MarkdownContent({ source }: { source: string }) {
-  const lines = source.replace(/^---[\s\S]*?---\s*/u, "").split(/\r?\n/);
+  const lines = source.replace(/^---[\s\S]*?---\s*/u, "").replace(/\r\n?/g, "\n").split("\n");
   const blocks: ReactNode[] = [];
   let paragraph: string[] = [];
 
@@ -1086,7 +1091,21 @@ function MarkdownContent({ source }: { source: string }) {
     const image = line.match(/^!\[([^\]]*)\]\(([^)]+)\)$/);
     if (image) {
       flushParagraph();
-      blocks.push(<figure key={`image-${index}`}><img src={image[2]} alt={image[1]} /><figcaption>{image[1]}</figcaption></figure>);
+      const imagePath = image[2].trim();
+      blocks.push(
+        <figure key={`image-${index}`}>
+          <img
+            src={resolveApiUrl(imagePath)}
+            alt={image[1]}
+            onError={(event) => {
+              if (event.currentTarget.dataset.fallbackAttempted === "true") return;
+              event.currentTarget.dataset.fallbackAttempted = "true";
+              event.currentTarget.src = imagePath;
+            }}
+          />
+          <figcaption>{image[1]}</figcaption>
+        </figure>,
+      );
       index += 1;
       continue;
     }
@@ -1110,7 +1129,8 @@ function ArticleListPage({ onOpenArticle }: { onOpenArticle: (slug: string) => v
   const pageSize = 5;
   const [articles, setArticles] = useState<ArticleSummary[]>([]);
   const [currentPage, setCurrentPage] = useState(0);
-  const [status, setStatus] = useState<"loading" | "ready" | "fallback">("loading");
+  const [status, setStatus] = useState<"loading" | "ready" | "fallback" | "error">("loading");
+  const [searchQuery, setSearchQuery] = useState("");
   const [hoveredSlug, setHoveredSlug] = useState<string | null>(null);
   const [previews, setPreviews] = useState<Record<string, string[]>>({});
   const [previewLoadingSlug, setPreviewLoadingSlug] = useState<string | null>(null);
@@ -1120,7 +1140,7 @@ function ArticleListPage({ onOpenArticle }: { onOpenArticle: (slug: string) => v
 
   useEffect(() => {
     let cancelled = false;
-    getAllPublishedArticles()
+    const timer = window.setTimeout(() => getAllPublishedArticles(50, searchQuery.trim() || undefined)
       .then((result) => {
         if (!cancelled) {
           setArticles(result);
@@ -1130,6 +1150,10 @@ function ArticleListPage({ onOpenArticle }: { onOpenArticle: (slug: string) => v
       })
       .catch(() => {
         if (!cancelled) {
+          if (usesDatabaseArticleContent) {
+            setStatus("error");
+            return;
+          }
           getLocalArticleIndex()
             .then((result) => {
               if (!cancelled) {
@@ -1146,10 +1170,10 @@ function ArticleListPage({ onOpenArticle }: { onOpenArticle: (slug: string) => v
               }
             });
         }
-      });
+      }), 300);
 
-    return () => { cancelled = true; };
-  }, []);
+    return () => { cancelled = true; window.clearTimeout(timer); };
+  }, [searchQuery]);
 
   const loadPreview = async (slug: string, signal: AbortSignal) => {
     if (Object.prototype.hasOwnProperty.call(previews, slug) || previewLoadingSlug === slug) return;
@@ -1160,7 +1184,7 @@ function ArticleListPage({ onOpenArticle }: { onOpenArticle: (slug: string) => v
         const article = await getPublishedArticle(slug, signal);
         markdown = article.contentMarkdown;
       } catch {
-        if (signal.aborted) return;
+        if (signal.aborted || usesDatabaseArticleContent) return;
         const response = await fetch(`/articles/${encodeURIComponent(slug)}/article.md`, { signal, headers: { Accept: "text/markdown" } });
         if (!response.ok) throw new Error("preview fallback request failed");
         markdown = await response.text();
@@ -1206,13 +1230,14 @@ function ArticleListPage({ onOpenArticle }: { onOpenArticle: (slug: string) => v
         <div className="article-list-heading">
           <div className="article-search-bar" role="search">
             <span className="article-search-bar__icon" aria-hidden="true">⌕</span>
-            <input type="search" aria-label="搜索文章" placeholder="搜索文章..." />
+            <input type="search" aria-label="搜索文章" placeholder="搜索文章..." value={searchQuery} onChange={(event) => setSearchQuery(event.target.value)} />
           </div>
         </div>
 
         {status === "loading" ? <p className="article-state">正在读取文章列表…</p> : null}
-        {status === "fallback" ? <p className="article-list-note">Java API 暂不可用，当前显示本地示例文章。</p> : null}
-        {status !== "loading" ? (
+        {status === "error" ? <p className="article-state">文章搜索服务暂时不可用。</p> : null}
+        {status === "fallback" ? <p className="article-list-note">API 暂不可用，当前显示本地示例文章。</p> : null}
+        {status === "ready" || status === "fallback" ? (
           <div className="article-timeline" aria-label="文章列表">
             {visibleArticles.map((article) => {
               const timelineDate = article.createdAt ?? article.publishedAt;
@@ -1234,7 +1259,7 @@ function ArticleListPage({ onOpenArticle }: { onOpenArticle: (slug: string) => v
                   >
                     {article.coverUrl ? (
                       <>
-                        <img className="article-list-card__cover" src={article.coverUrl} alt="" loading="lazy" decoding="async" />
+                        <img className="article-list-card__cover" src={resolveApiUrl(article.coverUrl)} alt="" loading="lazy" decoding="async" />
                         <div className="article-list-card__mask">
                           <h2 className="article-list-card__mask-title">{article.title}</h2>
                           <div className="article-list-card__preview" aria-live="polite"><div className="article-list-card__preview-copy">{isHovered ? (previewLoadingSlug === article.slug ? <span>正在读取正文…</span> : previews[article.slug]?.map((line, lineIndex) => <span key={`${article.slug}-preview-${lineIndex}`}>{line}</span>)) : null}</div></div>
@@ -1324,6 +1349,7 @@ function ChatterPage({ currentUser, onRequestLogin }: { currentUser: AuthUser | 
         const detail = await getChatterEntry(entry.slug);
         return [entry.slug, detail.contentMarkdown] as const;
       } catch {
+        if (usesDatabaseChatterContent) return [entry.slug, entry.preview] as const;
         try {
           return [entry.slug, await getLocalChatterEntry(entry.slug)] as const;
         } catch {
@@ -1437,7 +1463,12 @@ function ArticleDetailPage({
         }
         return;
       } catch {
-        // Fall back to the bundled Markdown demo while the Java API is offline.
+        // Fall back to the bundled Markdown demo while the API is offline.
+      }
+
+      if (usesDatabaseArticleContent) {
+        if (!cancelled) setStatus("error");
+        return;
       }
 
       try {
@@ -1466,7 +1497,7 @@ function ArticleDetailPage({
           aria-label="文章头图"
         >
           <button className="article-cover-back-button" type="button" aria-label="返回文章列表" onClick={onBack}>←</button>
-          {coverUrl ? <img className="article-cover-space__image" src={coverUrl} alt="" loading="eager" decoding="async" /> : null}
+          {coverUrl ? <img className="article-cover-space__image" src={resolveApiUrl(coverUrl)} alt="" loading="eager" decoding="async" /> : null}
         </div>
         <div className="article-seam-avatar" aria-hidden="true">
           <img src="/picture/portrait.png" alt="" loading="lazy" decoding="async" />
@@ -1477,7 +1508,7 @@ function ArticleDetailPage({
             return <time className="article-detail-date" dateTime={articleDate}>{formattedDate.date} {formattedDate.time}</time>;
           })() : null}
           {status === "loading" ? <p className="article-state">正在读取 Markdown…</p> : null}
-          {status === "error" ? <p className="article-state">暂时无法读取文章内容，请检查 Java API 或 Markdown 文件。</p> : null}
+          {status === "error" ? <p className="article-state">暂时无法读取文章内容，请检查 API 或 Markdown 文件。</p> : null}
           {status === "ready" ? <MarkdownContent source={source} /> : null}
           {status === "ready" ? (
             <CommentsPanel

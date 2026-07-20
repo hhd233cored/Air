@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { resolveApiUrl } from "../lib/api/client";
 
 function renderInlineMarkdown(text: string): ReactNode[] {
   const pattern = /(\[([^\]]+)\]\((https?:\/\/[^)\s]+)\)|`([^`]+)`|\*\*([^*]+)\*\*|\*([^*]+)\*)/g;
@@ -25,7 +26,7 @@ function renderInlineMarkdown(text: string): ReactNode[] {
 }
 
 export function MarkdownRenderer({ source }: { source: string }) {
-  const lines = source.replace(/^---[\s\S]*?---\s*/u, "").split(/\r?\n/);
+  const lines = source.replace(/^---[\s\S]*?---\s*/u, "").replace(/\r\n?/g, "\n").split("\n");
   const blocks: ReactNode[] = [];
   let paragraph: string[] = [];
 
@@ -104,7 +105,21 @@ export function MarkdownRenderer({ source }: { source: string }) {
     const image = line.match(/^!\[([^\]]*)\]\(([^)]+)\)$/);
     if (image) {
       flushParagraph();
-      blocks.push(<figure key={`image-${index}`}><img src={image[2]} alt={image[1]} /><figcaption>{image[1]}</figcaption></figure>);
+      const imagePath = image[2].trim();
+      blocks.push(
+        <figure key={`image-${index}`}>
+          <img
+            src={resolveApiUrl(imagePath)}
+            alt={image[1]}
+            onError={(event) => {
+              if (event.currentTarget.dataset.fallbackAttempted === "true") return;
+              event.currentTarget.dataset.fallbackAttempted = "true";
+              event.currentTarget.src = imagePath;
+            }}
+          />
+          <figcaption>{image[1]}</figcaption>
+        </figure>,
+      );
       index += 1;
       continue;
     }

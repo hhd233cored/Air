@@ -13,6 +13,7 @@ from typing import Any
 from .chatter_service import build_preview
 from .chatter_models import ChatterDetail, ChatterPageResponse, ChatterSummary
 from .editor_service import EditorArticleConflictError, EditorArticleNotFoundError, EditorError
+from .markdown_io import read_markdown, write_markdown
 
 
 VALID_STATUSES = {"DRAFT", "PUBLISHED", "ARCHIVED"}
@@ -54,8 +55,10 @@ class ChatterEditorService:
         self.chatter_root = chatter_root.resolve()
         self.chatter_root.mkdir(parents=True, exist_ok=True)
 
-    def list_entries(self, page: int, size: int) -> ChatterPageResponse:
-        entries = sorted(self._read_entries(), key=self._sort_key, reverse=True)
+    def list_entries(self, page: int, size: int, q: str | None = None) -> ChatterPageResponse:
+        normalized_query = q.strip().lower() if q and q.strip() else None
+        entries = [entry for entry in self._read_entries() if normalized_query is None or normalized_query in str(entry.get("contentMarkdown") or "").lower()]
+        entries = sorted(entries, key=self._sort_key, reverse=True)
         start = min(page * size, len(entries))
         end = min(start + size, len(entries))
         total_pages = 0 if not entries else (len(entries) + size - 1) // size
@@ -162,7 +165,7 @@ class ChatterEditorService:
         folder.mkdir(parents=True, exist_ok=True)
         content_temp = folder / f"chatter.md.tmp-{uuid.uuid4().hex}"
         metadata_temp = folder / f"chatter.json.tmp-{uuid.uuid4().hex}"
-        content_temp.write_text(content, encoding="utf-8")
+        write_markdown(content_temp, content)
         metadata_temp.write_text(json.dumps(metadata, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
         content_temp.replace(folder / "chatter.md")
         metadata_temp.replace(folder / "chatter.json")
@@ -180,7 +183,7 @@ class ChatterEditorService:
                 continue
             try:
                 raw = json.loads(metadata_path.read_text(encoding="utf-8"))
-                content = content_path.read_text(encoding="utf-8")
+                content = read_markdown(content_path)
                 if not isinstance(raw, dict) or not isinstance(raw.get("slug"), str):
                     continue
                 if raw["slug"].strip().lower() != folder.name.lower():

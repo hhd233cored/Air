@@ -1,6 +1,6 @@
-# Python 只读后端
+# Python 后端
 
-这是个人博客的轻量 FastAPI 后端。它不使用数据库、鉴权、Docker 或后台管理功能，文章直接从项目的 `public/articles/` 目录读取。
+这是个人博客的轻量 FastAPI 后端，负责公开内容、鉴权、评论、留言、音乐、历史上的今天和本地编辑器接口。后端使用 SQLite 保存鉴权、评论、留言和数据库模式下的文章/说说内容，不需要独立数据库服务、Docker 或 ORM。
 
 ## 接口
 
@@ -46,9 +46,9 @@ CORS_ALLOWED_ORIGINS=http://localhost:3000,http://127.0.0.1:3000,https://airchor
 
 密码至少 8 个字符。生产环境使用 HTTPS 时设置 `AUTH_COOKIE_SECURE=true`；只有在前端与 API 被浏览器视为跨站时，才将 `AUTH_COOKIE_SAMESITE` 改为 `None`。
 
-鉴权接口为 `GET /api/v1/auth/csrf`、`POST /api/v1/auth/register`、`POST /api/v1/auth/login`、`POST /api/v1/auth/logout` 和 `GET /api/v1/auth/me`。公开注册创建的账号永远是 `USER`，不能通过接口创建管理员。管理员可以在 `/admin` 页面控制公开注册，或者调用 `/api/v1/admin/settings/registration`；该设置保存到 SQLite，`AUTH_REGISTRATION_ENABLED` 只作为首次初始化默认值。公开 GET 接口保持匿名可用；只有 ADMIN 可以访问本地编辑器接口，USER 只能登录并读取公开内容。编辑器仍由 `EDITOR_ENABLED=true` 控制，生产启动脚本会强制关闭。
+鉴权接口为 `GET /api/v1/auth/csrf`、`POST /api/v1/auth/register`、`POST /api/v1/auth/login`、`POST /api/v1/auth/logout` 和 `GET /api/v1/auth/me`。公开注册创建的账号永远是 `USER`，不能通过接口创建管理员。管理员可以在 `/admin` 页面控制公开注册，或者调用 `/api/v1/admin/settings/registration`；该设置保存到 SQLite，`AUTH_REGISTRATION_ENABLED` 只作为首次初始化默认值。公开 GET 接口保持匿名可用；只有 ADMIN 可以访问本地编辑器接口，USER 只能登录并读取公开内容。编辑器已经整合在同一个 FastAPI 进程中，由 `EDITOR_ENABLED=true` 控制；生产启动脚本会强制关闭。
 
-本地编辑时先启动主 API，再启动编辑 API；两个进程要使用相同主机名（推荐都使用 `localhost`），浏览器才能共享 Cookie。登录主站后再打开 `/editor`。鉴权数据库已经加入 Git 忽略规则，但生产服务器应备份 `backend-python/data/auth.sqlite3`。
+本地编辑时只需启动主 API；编辑器和公开 API 共用 `8080` 端口，浏览器天然共享 Session 和 CSRF Cookie。登录主站后再打开 `/editor`。鉴权数据库已经加入 Git 忽略规则，但生产服务器应备份 `backend-python/data/auth.sqlite3`。
 
 说说保存在 `public/chatter/`，每条说说使用一个独立目录：
 
@@ -75,7 +75,7 @@ MUSIC_SOURCE=netease
 
 本地音乐放在 `music/` 目录，歌单文件为 `music/playlist.json`。JSON 只保存歌曲 `id` 和 `name`，标题、作者、专辑、时长和内嵌封面由 `mutagen` 从音频文件读取。后端只返回歌曲元数据和音频 URL，音频文件由 `/music/` 静态路径提供。
 
-接口路径和响应结构与 `backend/` 中的 Java 版本保持一致，切换后前端不需要修改 API 适配层。
+接口路径和响应结构保持稳定，前端不需要修改 API 适配层。
 
 ## Linux 一键安装
 
@@ -85,7 +85,7 @@ MUSIC_SOURCE=netease
 bash backend-python/install-linux.sh
 ```
 
-脚本会检查 Python 3.11+，创建 `backend-python/.venv`，并安装运行依赖。它不会修改系统 Python，也不会安装数据库或 Docker。
+脚本会检查 Python 3.11+，创建 `backend-python/.venv`，并安装运行依赖。它不会修改系统 Python，也不会安装独立数据库服务或 Docker。
 
 启动服务：
 
@@ -166,7 +166,6 @@ backend-python/.venv/bin/python -m pip install -r backend-python/requirements-de
 backend-python/.venv/bin/python -m pytest backend-python/tests -q
 ```
 
-Java 版本仍保留在 `backend/`，可继续使用原来的 Maven 命令。
 # 评论与头像（新增功能）
 
 评论使用同一个轻量 SQLite 鉴权数据库保存，不使用 PostgreSQL 或独立文件服务。公开文章和说说的评论可以匿名读取；只有登录用户可以发表评论、一级回复和删除自己的评论。评论发布后立即公开，管理员可以通过接口隐藏、恢复或删除评论。
@@ -251,3 +250,33 @@ Cloudflare 的规则可在 [WAF Rate limiting rules](https://developers.cloudfla
 ### 部署边界
 
 内存限流只在当前 Python 进程内生效。将来如果启动多个 worker 或多台服务器，计数会被分散，届时应将 `rate_limit.py` 替换为 Redis 等共享存储实现；不建议把每次请求写入 SQLite，因为这会增加锁竞争和磁盘写入。
+## 文章与说说的 SQLite 存储
+
+文章和说说可以从独立 Markdown 目录迁移到与鉴权共用的 SQLite 文件。数据库模式使用 FTS5，搜索标题、摘要、标签和正文；封面图及正文图片仍保存在 `public/articles/` 或 `public/chatter/` 中。
+
+迁移前先保持文件模式并检查内容：
+
+```powershell
+npm.cmd run content:migrate -- -DryRun
+```
+
+确认报告无误后执行迁移：
+
+```powershell
+npm.cmd run content:migrate
+```
+
+然后在根目录 `.env` 中切换：
+
+```env
+CONTENT_STORAGE=database
+NEXT_PUBLIC_CONTENT_STORAGE=database
+```
+
+切换后公开 API 和编辑器以 SQLite 为内容来源，不再从 Markdown 文件读取正文；原目录仍会保留，作为媒体文件和离线备份。切回 `files` 即可回到旧的文件读取模式。
+
+新增接口：
+
+```text
+GET /api/v1/search?q=关键词&type=ARTICLE|CHATTER|ALL&page=0&size=10
+```

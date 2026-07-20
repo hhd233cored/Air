@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import Any
 
 from .chatter_models import ChatterDetail, ChatterPageResponse, ChatterSummary
+from .markdown_io import read_markdown
 
 logger = logging.getLogger(__name__)
 
@@ -79,8 +80,13 @@ class ChatterService:
     def __init__(self, chatter_root: Path) -> None:
         self.chatter_root = chatter_root.resolve()
 
-    def list_published(self, page: int, size: int) -> ChatterPageResponse:
-        records = [record for record in self._read_records() if record.metadata.status == "PUBLISHED"]
+    def list_published(self, page: int, size: int, q: str | None = None) -> ChatterPageResponse:
+        normalized_query = q.strip().lower() if q and q.strip() else None
+        records = [
+            record for record in self._read_records()
+            if record.metadata.status == "PUBLISHED"
+            and (normalized_query is None or normalized_query in record.content_markdown.lower())
+        ]
         records.sort(
             key=lambda record: (
                 record.metadata.published_sort is not None,
@@ -142,7 +148,7 @@ class ChatterService:
                     continue
                 if not self._is_inside(content_path.resolve(), folder.resolve()):
                     continue
-                content = content_path.read_text(encoding="utf-8")
+                content = read_markdown(content_path)
                 records.append(ChatterRecord(metadata=metadata, content_markdown=content))
             except (OSError, ValueError, TypeError, json.JSONDecodeError) as exc:
                 logger.warning("Skipping invalid chatter %s: %s", metadata_path, exc)

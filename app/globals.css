@@ -562,6 +562,15 @@ audio { display: none; }
 .editor-file-row { grid-template-columns: 1fr 1fr; }
 .editor-file-input input { padding: 8px; font-size: 12px; }
 .editor-cover-preview { width: 150px; height: 90px; border: 1px solid rgb(104 90 135 / .18); border-radius: 9px; object-fit: cover; }
+.editor-cover-cropper { display: grid; max-width: 760px; gap: 11px; padding: 13px; border: 1px solid rgb(104 90 135 / .16); border-radius: 11px; background: rgb(255 255 255 / .34); }
+.editor-cover-cropper__header { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; color: var(--text); font-family: SimSun, "宋体", serif; }
+.editor-cover-cropper__header span { color: var(--muted); font-size: 11px; }
+.editor-cover-cropper__canvas { display: block; width: 100%; max-width: 720px; height: auto; aspect-ratio: 3 / 1; border: 1px solid rgb(104 90 135 / .2); border-radius: 8px; background: #f6f1f8; cursor: grab; touch-action: none; }
+.editor-cover-cropper__canvas:active { cursor: grabbing; }
+.editor-cover-cropper__zoom { display: grid; grid-template-columns: auto minmax(120px, 1fr) 42px; align-items: center; gap: 10px; color: var(--muted); font-size: 12px; }
+.editor-cover-cropper__zoom input { width: 100%; accent-color: var(--mint); }
+.editor-cover-cropper__zoom span { color: var(--muted); font-family: var(--font-geist-mono), Consolas, monospace; font-size: 10px; text-align: right; }
+.editor-cover-cropper__actions { display: flex; justify-content: flex-end; gap: 8px; }
 .editor-panels { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 18px; margin-top: 18px; }
 .editor-panel textarea { min-height: 520px; resize: vertical; font-family: var(--font-geist-mono), Consolas, monospace; font-size: 13px; }
 .editor-panel .markdown-content { max-width: none; margin: 0; min-height: 520px; font-size: 14px; }
