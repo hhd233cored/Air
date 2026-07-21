@@ -99,7 +99,11 @@ function getDominantCoverRgb(image: HTMLImageElement) {
     // Keep white text readable while preserving the hue of the extracted color.
     const luminance = dominant.rgb[0] * 0.2126 + dominant.rgb[1] * 0.7152 + dominant.rgb[2] * 0.0722;
     const brightnessScale = luminance > 132 ? 132 / luminance : 1;
-    return dominant.rgb.map((channel) => Math.round(channel * brightnessScale)).join(" ");
+    const whiteMix = 0.14;
+    return dominant.rgb
+      .map((channel) => Math.round(channel * brightnessScale))
+      .map((channel) => Math.round(channel + (255 - channel) * whiteMix))
+      .join(" ");
   } catch {
     // A cross-origin image without CORS headers taints the canvas. The card can
     // still display the image, so keep the configured fallback color instead.
@@ -112,7 +116,7 @@ function useArticleMaskColor(slug: string, coverSrc: string) {
   const [maskState, setMaskState] = useState({ coverSrc, maskRgb: fallback });
   const maskRgb = maskState.coverSrc === coverSrc ? maskState.maskRgb : fallback;
 
-  const handleCoverLoad = (event: React.SyntheticEvent<HTMLImageElement>) => {
+  const handleCoverLoad = useCallback((event: React.SyntheticEvent<HTMLImageElement>) => {
     const dominant = getDominantCoverRgb(event.currentTarget);
     if (dominant) {
       setMaskState({ coverSrc, maskRgb: dominant });
@@ -128,7 +132,7 @@ function useArticleMaskColor(slug: string, coverSrc: string) {
       if (probeColor) setMaskState({ coverSrc, maskRgb: probeColor });
     };
     probe.src = coverSrc;
-  };
+  }, [coverSrc]);
 
   return { maskRgb, handleCoverLoad };
 }
@@ -821,10 +825,17 @@ function HomeArticleCard({ article, onOpenArticle }: { article: ArticleSummary; 
   const [previewLines, setPreviewLines] = useState<string[]>([]);
   const [previewLoading, setPreviewLoading] = useState(false);
   const previewAbortRef = useRef<AbortController | null>(null);
+  const coverImageRef = useRef<HTMLImageElement | null>(null);
   const coverSrc = resolveApiUrl(article.coverUrl);
   const { maskRgb, handleCoverLoad } = useArticleMaskColor(article.slug, coverSrc);
 
   useEffect(() => () => previewAbortRef.current?.abort(), []);
+
+  useEffect(() => {
+    const image = coverImageRef.current;
+    if (!image?.complete || !image.naturalWidth) return;
+    handleCoverLoad({ currentTarget: image } as React.SyntheticEvent<HTMLImageElement>);
+  }, [coverSrc, handleCoverLoad]);
 
   const loadPreview = async (signal: AbortSignal) => {
     if (previewLines.length || previewLoading) return;
@@ -862,7 +873,7 @@ function HomeArticleCard({ article, onOpenArticle }: { article: ArticleSummary; 
     >
       {article.coverUrl ? (
         <>
-          <img className="article-list-card__cover" src={coverSrc} alt="" loading="eager" decoding="async" onLoad={handleCoverLoad} />
+          <img ref={coverImageRef} className="article-list-card__cover" src={coverSrc} alt="" loading="eager" decoding="async" onLoad={handleCoverLoad} />
           <div className="article-list-card__mask">
             <h2 className="article-list-card__mask-title">{article.title}</h2>
             <div className="article-list-card__preview" aria-live="polite"><div className="article-list-card__preview-copy">{isHovered ? (previewLoading ? <span>正在读取正文…</span> : previewLines.map((line, lineIndex) => <span key={`${article.slug}-home-preview-${lineIndex}`}>{line}</span>)) : null}</div></div>

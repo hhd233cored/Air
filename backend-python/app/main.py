@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import hmac
 import ipaddress
+import mimetypes
 import secrets
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
@@ -123,6 +124,7 @@ async def lifespan(_: FastAPI):
 
 
 app = FastAPI(title="Your Space API", docs_url=None, redoc_url=None, lifespan=lifespan)
+mimetypes.add_type("image/webp", ".webp")
 app.mount("/articles", StaticFiles(directory=settings.article_content_dir), name="articles")
 app.mount("/chatter", StaticFiles(directory=settings.chatter_content_dir), name="chatter")
 app.mount("/music", StaticFiles(directory=settings.music_content_dir), name="music")
