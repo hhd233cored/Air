@@ -114,7 +114,20 @@ function useArticleMaskColor(slug: string, coverSrc: string) {
 
   const handleCoverLoad = (event: React.SyntheticEvent<HTMLImageElement>) => {
     const dominant = getDominantCoverRgb(event.currentTarget);
-    setMaskState({ coverSrc, maskRgb: dominant ?? fallback });
+    if (dominant) {
+      setMaskState({ coverSrc, maskRgb: dominant });
+      return;
+    }
+
+    // Keep the visible image as a normal <img>. If the API opts into CORS,
+    // retry color extraction through a separate probe without blocking display.
+    const probe = new Image();
+    probe.crossOrigin = "anonymous";
+    probe.onload = () => {
+      const probeColor = getDominantCoverRgb(probe);
+      if (probeColor) setMaskState({ coverSrc, maskRgb: probeColor });
+    };
+    probe.src = coverSrc;
   };
 
   return { maskRgb, handleCoverLoad };
@@ -849,7 +862,7 @@ function HomeArticleCard({ article, onOpenArticle }: { article: ArticleSummary; 
     >
       {article.coverUrl ? (
         <>
-          <img className="article-list-card__cover" src={coverSrc} alt="" loading="eager" decoding="async" crossOrigin="anonymous" onLoad={handleCoverLoad} />
+          <img className="article-list-card__cover" src={coverSrc} alt="" loading="eager" decoding="async" onLoad={handleCoverLoad} />
           <div className="article-list-card__mask">
             <h2 className="article-list-card__mask-title">{article.title}</h2>
             <div className="article-list-card__preview" aria-live="polite"><div className="article-list-card__preview-copy">{isHovered ? (previewLoading ? <span>正在读取正文…</span> : previewLines.map((line, lineIndex) => <span key={`${article.slug}-home-preview-${lineIndex}`}>{line}</span>)) : null}</div></div>
@@ -1204,7 +1217,19 @@ function ArticleCoverColorSync({ slug, coverSrc }: { slug: string; coverSrc: str
     if (!card || !image) return;
 
     const syncColor = () => {
-      card.style.setProperty("--article-mask-rgb", getDominantCoverRgb(image) ?? fallback);
+      const dominant = getDominantCoverRgb(image);
+      if (dominant) {
+        card.style.setProperty("--article-mask-rgb", dominant);
+        return;
+      }
+
+      const probe = new Image();
+      probe.crossOrigin = "anonymous";
+      probe.onload = () => {
+        const probeColor = getDominantCoverRgb(probe);
+        if (probeColor) card.style.setProperty("--article-mask-rgb", probeColor);
+      };
+      probe.src = coverSrc;
     };
     card.style.setProperty("--article-mask-rgb", fallback);
     if (image.complete) syncColor();
@@ -1350,7 +1375,7 @@ function ArticleListPage({ onOpenArticle }: { onOpenArticle: (slug: string) => v
                     {article.coverUrl ? <ArticleCoverColorSync slug={article.slug} coverSrc={resolveApiUrl(article.coverUrl)} /> : null}
                     {article.coverUrl ? (
                       <>
-                        <img className="article-list-card__cover" src={resolveApiUrl(article.coverUrl)} alt="" loading="lazy" decoding="async" crossOrigin="anonymous" />
+                        <img className="article-list-card__cover" src={resolveApiUrl(article.coverUrl)} alt="" loading="lazy" decoding="async" />
                         <div className="article-list-card__mask">
                           <h2 className="article-list-card__mask-title">{article.title}</h2>
                           <div className="article-list-card__preview" aria-live="polite"><div className="article-list-card__preview-copy">{isHovered ? (previewLoadingSlug === article.slug ? <span>正在读取正文…</span> : previews[article.slug]?.map((line, lineIndex) => <span key={`${article.slug}-preview-${lineIndex}`}>{line}</span>)) : null}</div></div>
