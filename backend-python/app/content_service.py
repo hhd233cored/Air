@@ -21,6 +21,7 @@ from .article_service import ArticleNotFoundError
 from .chatter_models import ChatterDetail, ChatterPageResponse, ChatterSummary
 from .chatter_service import ChatterNotFoundError, build_preview
 from .content_models import ContentSearchPageResponse, ContentSearchResult
+from .cover_color import extract_cover_color
 from .editor_models import EditorArticleDetail, EditorArticlePageResponse, EditorArticleSummary
 from .editor_service import (
     ALLOWED_ASSET_EXTENSIONS,
@@ -109,6 +110,7 @@ class ContentStore:
                     tags_json TEXT NOT NULL DEFAULT '[]',
                     content_markdown TEXT NOT NULL,
                     cover_path TEXT NULL,
+                    cover_color TEXT NULL,
                     status TEXT NOT NULL CHECK (status IN ('DRAFT', 'PUBLISHED', 'ARCHIVED')),
                     published_at TEXT NULL,
                     created_at TEXT NOT NULL,
@@ -123,6 +125,9 @@ class ContentStore:
                     ON content_items(content_type, updated_at);
                 """
             )
+            columns = {str(row[1]) for row in connection.execute("PRAGMA table_info(content_items)").fetchall()}
+            if "cover_color" not in columns:
+                connection.execute("ALTER TABLE content_items ADD COLUMN cover_color TEXT NULL")
             try:
                 connection.execute(
                     """CREATE VIRTUAL TABLE IF NOT EXISTS content_search USING fts5(
@@ -198,12 +203,13 @@ class ContentStore:
         created_at: str,
         updated_at: str,
     ) -> None:
+        cover_color = self._cover_color(content_type, slug, cover_path)
         connection.execute(
             """
                 INSERT INTO content_items
                     (id, content_type, slug, title, summary, tags_json, content_markdown,
-                     cover_path, status, published_at, created_at, updated_at, deleted_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL)
+                     cover_path, cover_color, status, published_at, created_at, updated_at, deleted_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL)
                 ON CONFLICT(content_type, slug) DO UPDATE SET
                     id = excluded.id,
                     title = excluded.title,
@@ -211,6 +217,7 @@ class ContentStore:
                     tags_json = excluded.tags_json,
                     content_markdown = excluded.content_markdown,
                     cover_path = excluded.cover_path,
+                    cover_color = excluded.cover_color,
                     status = excluded.status,
                     published_at = excluded.published_at,
                     created_at = excluded.created_at,
@@ -219,7 +226,7 @@ class ContentStore:
                 """,
             (
                 content_id, content_type, slug, title, summary, _json_tags(tags),
-                normalize_markdown(content_markdown), cover_path, status, published_at, created_at, updated_at,
+                normalize_markdown(content_markdown), cover_path, cover_color, status, published_at, created_at, updated_at,
             ),
         )
         self._refresh_fts(connection, content_id)
@@ -373,13 +380,22 @@ class ContentStore:
             raise EditorError("INVALID_PATH", "Content path is outside the content directory")
         return folder
 
+    def _cover_color(self, content_type: str, slug: str, cover_path: str | None) -> str | None:
+        if content_type != ARTICLE or not cover_path:
+            return None
+        folder = self.media_folder(ARTICLE, slug)
+        path = (folder / str(cover_path).replace("\\", "/")).resolve()
+        if not _is_inside(path, folder):
+            raise EditorError("INVALID_PATH", "Cover path is outside the content directory")
+        return extract_cover_color(path)
+
 
 def _article_summary(store: ContentStore, row: sqlite3.Row, editor: bool = False) -> ArticleSummary | EditorArticleSummary:
     cover = _cover_url(store, row) if row["content_type"] == ARTICLE else None
     model = EditorArticleSummary if editor else ArticleSummary
     return model(
         id=str(row["id"]), slug=row["slug"], title=row["title"] or "", summary=row["summary"],
-        coverUrl=cover, tags=_tags(row["tags_json"]), status=row["status"],
+        coverUrl=cover, coverColor=row["cover_color"], tags=_tags(row["tags_json"]), status=row["status"],
         publishedAt=row["published_at"], createdAt=row["created_at"], updatedAt=row["updated_at"],
     )
 
@@ -466,7 +482,7 @@ class DatabaseArticleEditorService:
         await self._save_assets(folder, assets)
         content_id = f"article-{uuid.uuid4().hex}"
         self.store.upsert(content_id=content_id, content_type=ARTICLE, slug=clean_slug, title=clean_title, summary=summary.strip() if summary else None, tags=tags or [], content_markdown=content_markdown, cover_path=cover_name, status=status_value, published_at=published, created_at=now, updated_at=now)
-        self._write_backup(folder, {"id": content_id, "slug": clean_slug, "title": clean_title, "summary": summary, "tags": _tags(tags or []), "status": status_value, "publishedAt": published, "createdAt": now, "updatedAt": now, "cover": cover_name}, content_markdown, "article")
+        self._write_backup(folder, {"id": content_id, "slug": clean_slug, "title": clean_title, "summary": summary, "tags": _tags(tags or []), "status": status_value, "publishedAt": published, "createdAt": now, "updatedAt": now, "cover": cover_name, "coverColor": extract_cover_color(folder / cover_name)}, content_markdown, "article")
         return self.get_article(clean_slug)
 
     async def update_article(self, slug: str, *, title: str, new_slug: str | None, summary: str | None, tags: str | None, status: str | None, published_at: str | None, content_markdown: str, cover: UploadFile | None, assets: Iterable[UploadFile] = ()) -> EditorArticleDetail:
@@ -499,7 +515,7 @@ class DatabaseArticleEditorService:
         status_value, published = self._status(status, published_at, current)
         updated = _now()
         self.store.upsert(content_id=str(current["id"]), content_type=ARTICLE, slug=clean_slug, title=clean_title, summary=summary.strip() if summary else None, tags=tags or current["tags_json"], content_markdown=content_markdown, cover_path=cover_name, status=status_value, published_at=published, created_at=str(current["created_at"]), updated_at=updated)
-        self._write_backup(folder, {"id": current["id"], "slug": clean_slug, "title": clean_title, "summary": summary, "tags": _tags(tags or current["tags_json"]), "status": status_value, "publishedAt": published, "createdAt": current["created_at"], "updatedAt": updated, "cover": cover_name}, content_markdown, "article")
+        self._write_backup(folder, {"id": current["id"], "slug": clean_slug, "title": clean_title, "summary": summary, "tags": _tags(tags or current["tags_json"]), "status": status_value, "publishedAt": published, "createdAt": current["created_at"], "updatedAt": updated, "cover": cover_name, "coverColor": extract_cover_color(folder / cover_name)}, content_markdown, "article")
         return self.get_article(clean_slug)
 
     def delete_article(self, slug: str) -> None:
@@ -683,7 +699,8 @@ def to_search_page(store: ContentStore, query: str, content_type: str, page: int
         results.append(ContentSearchResult(
             contentType=row["content_type"], id=str(row["id"]), slug=row["slug"],
             title=row["title"], preview=build_preview(row["content_markdown"]), summary=row["summary"],
-            coverUrl=_cover_url(store, row), tags=_tags(row["tags_json"]), status=row["status"],
+            coverUrl=_cover_url(store, row), coverColor=row["cover_color"] if row["content_type"] == ARTICLE else None,
+            tags=_tags(row["tags_json"]), status=row["status"],
             publishedAt=row["published_at"], createdAt=row["created_at"], updatedAt=row["updated_at"],
         ))
     return ContentSearchPageResponse(content=results, page=page, size=size, totalElements=total, totalPages=_page(page, size, total))

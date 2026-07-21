@@ -94,6 +94,7 @@ foreach ($item in @($manifest.articles)) {
         title = $metadata.title
         summary = $metadata.summary
         coverUrl = if ($coverName) { "/articles/$slug/$coverName" } else { $null }
+        coverColor = if ($item.coverColor) { [string]$item.coverColor } else { $null }
         tags = @($metadata.tags)
         status = $status
         publishedAt = $metadata.publishedAt

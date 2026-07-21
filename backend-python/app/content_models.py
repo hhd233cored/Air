@@ -20,6 +20,7 @@ class ContentSearchResult(BaseModel):
     publishedAt: str | None
     createdAt: str | None
     updatedAt: str | None
+    coverColor: str | None = None
 
 
 class ContentSearchPageResponse(BaseModel):

@@ -17,7 +17,8 @@
     "articles:export": "powershell -ExecutionPolicy Bypass -File scripts/export-articles.ps1",
     "articles:import": "powershell -ExecutionPolicy Bypass -File scripts/import-articles.ps1",
     "content:migrate": "powershell -ExecutionPolicy Bypass -File scripts/migrate-content.ps1",
-    "content:migrate:linux": "bash scripts/migrate-content.sh"
+    "content:migrate:linux": "bash scripts/migrate-content.sh",
+    "content:colors": "powershell -ExecutionPolicy Bypass -File scripts/build-cover-colors.ps1"
   },
   "dependencies": {
     "next": "16.2.6",

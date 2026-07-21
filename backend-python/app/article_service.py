@@ -33,6 +33,7 @@ class ArticleMetadata:
     created_at: str | None
     updated_at: str | None
     cover: str | None
+    cover_color: str | None
     published_sort: datetime | None
     created_sort: datetime | None
 
@@ -197,6 +198,7 @@ class ArticleService:
             created_at=created_at,
             updated_at=updated_at,
             cover=raw.get("cover") if isinstance(raw.get("cover"), str) else None,
+            cover_color=raw.get("coverColor") if isinstance(raw.get("coverColor"), str) else None,
             published_sort=published_sort,
             created_sort=created_sort,
         )
@@ -208,6 +210,7 @@ class ArticleService:
             title=metadata.title,
             summary=metadata.summary,
             coverUrl=self._cover_url(metadata),
+            coverColor=metadata.cover_color,
             tags=list(dict.fromkeys(
                 normalized for normalized in (_normalize_tag(tag) for tag in metadata.tags)
                 if normalized is not None

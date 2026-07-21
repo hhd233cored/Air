@@ -6,6 +6,7 @@ export type ArticleSummary = {
   title: string;
   summary: string | null;
   coverUrl: string | null;
+  coverColor?: string | null;
   tags: string[];
   status: "DRAFT" | "PUBLISHED" | "ARCHIVED";
   publishedAt: string | null;

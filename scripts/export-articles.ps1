@@ -58,6 +58,7 @@ foreach ($sourceDirectory in @(Get-ChildItem -LiteralPath $articlesRoot -Directo
         title = $metadata.title
         summary = $metadata.summary
         coverUrl = if ($coverFile) { "/articles/$slug/$([System.IO.Path]::GetFileName($coverFile))" } else { $null }
+        coverColor = $metadata.coverColor
         tags = @($metadata.tags)
         coverFile = $coverFile
         status = $metadata.status

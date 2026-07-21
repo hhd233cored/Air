@@ -20,6 +20,7 @@ class ArticleSummary(BaseModel):
     publishedAt: str | None
     createdAt: str | None
     updatedAt: str | None
+    coverColor: str | None = None
 
 
 class ArticleDetail(ArticleSummary):

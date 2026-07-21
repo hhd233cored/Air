@@ -16,6 +16,7 @@ from typing import Any, Iterable
 
 from fastapi import UploadFile
 
+from .cover_color import extract_cover_color
 from .editor_models import EditorArticleDetail, EditorArticlePageResponse, EditorArticleSummary
 from .markdown_io import read_markdown, write_markdown
 
@@ -282,6 +283,7 @@ class ArticleEditorService:
             await self._copy_upload(cover, folder / cover_name, ALLOWED_COVER_EXTENSIONS)
         if cover_name and not (folder / cover_name).is_file():
             raise EditorError("COVER_REQUIRED", "A cover image is required")
+        metadata["coverColor"] = extract_cover_color(folder / cover_name) if cover_name else None
         for asset in assets:
             if not asset.filename:
                 continue
@@ -356,6 +358,7 @@ class ArticleEditorService:
             title=metadata["title"],
             summary=metadata.get("summary") if isinstance(metadata.get("summary"), str) else None,
             coverUrl=f"/articles/{metadata['slug']}/{cover}" if cover_path and cover_path.is_file() else None,
+            coverColor=metadata.get("coverColor") if isinstance(metadata.get("coverColor"), str) else None,
             tags=list(metadata.get("tags") or []),
             status=str(metadata.get("status") or "DRAFT").upper(),
             publishedAt=metadata.get("publishedAt"),
