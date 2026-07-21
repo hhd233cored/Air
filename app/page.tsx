@@ -44,6 +44,7 @@ const fallbackArticleList: ArticleSummary[] = [
   },
 ];
 
+const defaultArticleMaskRgb = "82 65 125";
 const articleMaskColors: Record<string, string> = {
   "first-note": "110 101 127",
   "quiet-corner": "153 129 141",
@@ -51,6 +52,73 @@ const articleMaskColors: Record<string, string> = {
   "the-weather-of-a-day": "163 135 117",
   "small-things-worth-keeping": "158 132 118",
 };
+
+function getDominantCoverRgb(image: HTMLImageElement) {
+  if (!image.naturalWidth || !image.naturalHeight) return null;
+
+  const sampleSize = 40;
+  const canvas = document.createElement("canvas");
+  canvas.width = sampleSize;
+  canvas.height = sampleSize;
+  const context = canvas.getContext("2d", { willReadFrequently: true });
+  if (!context) return null;
+
+  try {
+    // Sample the same centered crop that object-fit: cover displays in the card.
+    const cropScale = Math.max(sampleSize / image.naturalWidth, sampleSize / image.naturalHeight);
+    const sourceWidth = sampleSize / cropScale;
+    const sourceHeight = sampleSize / cropScale;
+    const sourceLeft = (image.naturalWidth - sourceWidth) / 2;
+    const sourceTop = (image.naturalHeight - sourceHeight) / 2;
+    context.drawImage(image, sourceLeft, sourceTop, sourceWidth, sourceHeight, 0, 0, sampleSize, sampleSize);
+
+    const pixels = context.getImageData(0, 0, sampleSize, sampleSize).data;
+    const buckets = new Map<string, { score: number; rgb: [number, number, number] }>();
+    for (let index = 0; index < pixels.length; index += 16) {
+      const alpha = pixels[index + 3];
+      if (alpha < 128) continue;
+
+      const channels = [pixels[index], pixels[index + 1], pixels[index + 2]];
+      const maximum = Math.max(...channels);
+      const minimum = Math.min(...channels);
+      const brightness = (channels[0] + channels[1] + channels[2]) / 3;
+      const saturation = (maximum - minimum) / 255;
+      // White highlights and page-like backgrounds should not win the palette.
+      if (brightness > 244 && saturation < 0.12) continue;
+
+      const rgb = channels.map((channel) => Math.min(255, Math.round(channel / 16) * 16)) as [number, number, number];
+      const key = rgb.join(" ");
+      const bucket = buckets.get(key) ?? { score: 0, rgb };
+      bucket.score += 0.7 + saturation * 1.8;
+      buckets.set(key, bucket);
+    }
+
+    const dominant = [...buckets.values()].sort((left, right) => right.score - left.score)[0];
+    if (!dominant) return null;
+
+    // Keep white text readable while preserving the hue of the extracted color.
+    const luminance = dominant.rgb[0] * 0.2126 + dominant.rgb[1] * 0.7152 + dominant.rgb[2] * 0.0722;
+    const brightnessScale = luminance > 132 ? 132 / luminance : 1;
+    return dominant.rgb.map((channel) => Math.round(channel * brightnessScale)).join(" ");
+  } catch {
+    // A cross-origin image without CORS headers taints the canvas. The card can
+    // still display the image, so keep the configured fallback color instead.
+    return null;
+  }
+}
+
+function useArticleMaskColor(slug: string, coverSrc: string) {
+  const fallback = articleMaskColors[slug] ?? defaultArticleMaskRgb;
+  const [maskState, setMaskState] = useState({ coverSrc, maskRgb: fallback });
+  const maskRgb = maskState.coverSrc === coverSrc ? maskState.maskRgb : fallback;
+
+  const handleCoverLoad = (event: React.SyntheticEvent<HTMLImageElement>) => {
+    const dominant = getDominantCoverRgb(event.currentTarget);
+    setMaskState({ coverSrc, maskRgb: dominant ?? fallback });
+  };
+
+  return { maskRgb, handleCoverLoad };
+}
 
 function formatArticleCreatedAt(value: string | null) {
   if (!value) return { date: "----.--.--", time: "--:--" };
@@ -740,6 +808,8 @@ function HomeArticleCard({ article, onOpenArticle }: { article: ArticleSummary; 
   const [previewLines, setPreviewLines] = useState<string[]>([]);
   const [previewLoading, setPreviewLoading] = useState(false);
   const previewAbortRef = useRef<AbortController | null>(null);
+  const coverSrc = resolveApiUrl(article.coverUrl);
+  const { maskRgb, handleCoverLoad } = useArticleMaskColor(article.slug, coverSrc);
 
   useEffect(() => () => previewAbortRef.current?.abort(), []);
 
@@ -775,11 +845,11 @@ function HomeArticleCard({ article, onOpenArticle }: { article: ArticleSummary; 
       onMouseLeave={() => { setIsHovered(false); previewAbortRef.current?.abort(); }}
       onFocus={handleHover}
       onBlur={() => { setIsHovered(false); previewAbortRef.current?.abort(); }}
-      style={{ "--article-mask-rgb": articleMaskColors[article.slug] ?? "110 101 127" } as React.CSSProperties}
+      style={{ "--article-mask-rgb": maskRgb } as React.CSSProperties}
     >
       {article.coverUrl ? (
         <>
-          <img className="article-list-card__cover" src={resolveApiUrl(article.coverUrl)} alt="" loading="eager" decoding="async" />
+          <img className="article-list-card__cover" src={coverSrc} alt="" loading="eager" decoding="async" crossOrigin="anonymous" onLoad={handleCoverLoad} />
           <div className="article-list-card__mask">
             <h2 className="article-list-card__mask-title">{article.title}</h2>
             <div className="article-list-card__preview" aria-live="polite"><div className="article-list-card__preview-copy">{isHovered ? (previewLoading ? <span>正在读取正文…</span> : previewLines.map((line, lineIndex) => <span key={`${article.slug}-home-preview-${lineIndex}`}>{line}</span>)) : null}</div></div>
@@ -1124,6 +1194,27 @@ function MarkdownContent({ source }: { source: string }) {
   return <div className="markdown-content">{blocks}</div>;
 }
 
+function ArticleCoverColorSync({ slug, coverSrc }: { slug: string; coverSrc: string }) {
+  const anchorRef = useRef<HTMLSpanElement>(null);
+  const fallback = articleMaskColors[slug] ?? defaultArticleMaskRgb;
+
+  useEffect(() => {
+    const card = anchorRef.current?.closest<HTMLElement>(".article-list-card");
+    const image = card?.querySelector<HTMLImageElement>(".article-list-card__cover");
+    if (!card || !image) return;
+
+    const syncColor = () => {
+      card.style.setProperty("--article-mask-rgb", getDominantCoverRgb(image) ?? fallback);
+    };
+    card.style.setProperty("--article-mask-rgb", fallback);
+    if (image.complete) syncColor();
+    image.addEventListener("load", syncColor);
+    return () => image.removeEventListener("load", syncColor);
+  }, [coverSrc, fallback]);
+
+  return <span ref={anchorRef} hidden aria-hidden="true" />;
+}
+
 function ArticleListPage({ onOpenArticle }: { onOpenArticle: (slug: string) => void }) {
   const pageSize = 5;
   const [articles, setArticles] = useState<ArticleSummary[]>([]);
@@ -1254,11 +1345,12 @@ function ArticleListPage({ onOpenArticle }: { onOpenArticle: (slug: string) => v
                     onMouseLeave={handleArticleLeave}
                     onFocus={() => handleArticleHover(article.slug)}
                     onBlur={handleArticleLeave}
-                    style={{ "--article-mask-rgb": articleMaskColors[article.slug] ?? "110 101 127" } as React.CSSProperties}
+                    style={{ "--article-mask-rgb": articleMaskColors[article.slug] ?? defaultArticleMaskRgb } as React.CSSProperties}
                   >
+                    {article.coverUrl ? <ArticleCoverColorSync slug={article.slug} coverSrc={resolveApiUrl(article.coverUrl)} /> : null}
                     {article.coverUrl ? (
                       <>
-                        <img className="article-list-card__cover" src={resolveApiUrl(article.coverUrl)} alt="" loading="lazy" decoding="async" />
+                        <img className="article-list-card__cover" src={resolveApiUrl(article.coverUrl)} alt="" loading="lazy" decoding="async" crossOrigin="anonymous" />
                         <div className="article-list-card__mask">
                           <h2 className="article-list-card__mask-title">{article.title}</h2>
                           <div className="article-list-card__preview" aria-live="polite"><div className="article-list-card__preview-copy">{isHovered ? (previewLoadingSlug === article.slug ? <span>正在读取正文…</span> : previews[article.slug]?.map((line, lineIndex) => <span key={`${article.slug}-preview-${lineIndex}`}>{line}</span>)) : null}</div></div>
