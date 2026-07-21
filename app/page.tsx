@@ -9,7 +9,7 @@ import { getMusicPlaylist, getMusicTrackUrl, type MusicTrackSummary } from "./li
 import { type AuthUser, getCurrentUser } from "./lib/api/auth";
 import { AuthPanel } from "./components/AuthPanel";
 import { CommentsPanel } from "./components/CommentsPanel";
-import { MarkdownRenderer } from "./components/MarkdownRenderer";
+import { highlightCode, languageKey, languageLabel, MarkdownRenderer } from "./components/MarkdownRenderer";
 import { MaintenancePage } from "./components/MaintenancePage";
 
 type PageKey = "home" | "projects" | "article" | "chatter" | "guestbook";
@@ -995,7 +995,19 @@ function ProjectsPage() {
   );
 }
 
-function renderInlineMarkdown(text: string): ReactNode[] {
+function renderInlineLine(text: string, keyPrefix: string): ReactNode[] {
+  const definition = text.match(/^(\s*)`([^`]+)`\s*([:：])\s*(.*)$/u);
+  if (definition) {
+    return [
+      <span className="markdown-definition" key={`${keyPrefix}-definition`}>
+        <span className="markdown-definition__bullet" aria-hidden="true">•</span>
+        <code>{definition[2]}</code>
+        <span className="markdown-definition__separator">{definition[3]}</span>
+        <span className="markdown-definition__value">{renderInlineLine(definition[4], `${keyPrefix}-value`)}</span>
+      </span>,
+    ];
+  }
+
   const pattern = /(\[([^\]]+)\]\((https?:\/\/[^)\s]+)\)|`([^`]+)`|\*\*([^*]+)\*\*|\*([^*]+)\*)/g;
   const nodes: ReactNode[] = [];
   let lastIndex = 0;
@@ -1004,19 +1016,26 @@ function renderInlineMarkdown(text: string): ReactNode[] {
   while ((match = pattern.exec(text)) !== null) {
     if (match.index > lastIndex) nodes.push(text.slice(lastIndex, match.index));
     if (match[2] && match[3]) {
-      nodes.push(<a href={match[3]} key={`link-${match.index}`} target="_blank" rel="noreferrer">{match[2]}</a>);
+      nodes.push(<a href={match[3]} key={`${keyPrefix}-link-${match.index}`} target="_blank" rel="noreferrer">{match[2]}</a>);
     } else if (match[4]) {
-      nodes.push(<code key={`code-${match.index}`}>{match[4]}</code>);
+      nodes.push(<code key={`${keyPrefix}-code-${match.index}`}>{match[4]}</code>);
     } else if (match[5]) {
-      nodes.push(<strong key={`strong-${match.index}`}>{match[5]}</strong>);
+      nodes.push(<strong key={`${keyPrefix}-strong-${match.index}`}>{match[5]}</strong>);
     } else if (match[6]) {
-      nodes.push(<em key={`em-${match.index}`}>{match[6]}</em>);
+      nodes.push(<em key={`${keyPrefix}-em-${match.index}`}>{match[6]}</em>);
     }
     lastIndex = pattern.lastIndex;
   }
 
   if (lastIndex < text.length) nodes.push(text.slice(lastIndex));
   return nodes;
+}
+
+function renderInlineMarkdown(text: string): ReactNode[] {
+  return text.split("\n").flatMap((line, lineIndex, lines) => [
+    ...renderInlineLine(line, `inline-${lineIndex}`),
+    ...(lineIndex < lines.length - 1 ? ["\n"] : []),
+  ]);
 }
 
 function MarkdownContent({ source }: { source: string }) {
@@ -1070,7 +1089,14 @@ function MarkdownContent({ source }: { source: string }) {
         index += 1;
       }
       index += 1;
-      blocks.push(<pre key={`code-block-${index}`} data-language={language || undefined}><code>{codeLines.join("\n")}</code></pre>);
+      const code = codeLines.join("\n");
+      const label = languageLabel(language);
+      blocks.push(
+        <div className="markdown-code" key={`code-block-${index}`} data-language={languageKey(language) || undefined}>
+          {label ? <div className="markdown-code__header"><span>{label}</span></div> : null}
+          <pre><code>{highlightCode(code)}</code></pre>
+        </div>,
+      );
       continue;
     }
 
