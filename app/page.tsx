@@ -1579,9 +1579,9 @@ function SiteApp() {
   };
 
   const openArticle = (slug: string) => {
-    pendingNavigationScrollRef.current = true;
-    setSelectedArticleSlug(slug);
-    setActivePage("article");
+    const articleUrl = new URL("/article/", window.location.origin);
+    articleUrl.searchParams.set("slug", slug);
+    window.open(articleUrl.toString(), "_blank", "noopener,noreferrer");
   };
 
   const returnHomeToInitialPosition = () => {
@@ -1662,7 +1662,7 @@ function SiteApp() {
             {authUser?.avatarUrl ? <img src={resolveApiUrl(authUser.avatarUrl)} alt="" /> : authUser ? <span className="header-auth-button__empty" aria-hidden="true" /> : null}
           </button>
           {authUser ? <span className="header-auth-label"><strong>{authUser.username}</strong><small>{authUser.role}</small></span> : null}
-          {authPanelOpen ? <AuthPanel user={authUser} onUserChange={setAuthUser} onClose={() => setAuthPanelOpen(false)} onOpenAdmin={() => { setAuthPanelOpen(false); window.location.assign("/admin/"); }} onOpenMusic={() => { setAuthPanelOpen(false); window.location.assign("/admin/music/"); }} onOpenEditor={() => { setAuthPanelOpen(false); window.location.assign("/editor/"); }} /> : null}
+          {authPanelOpen ? <AuthPanel user={authUser} onUserChange={setAuthUser} onClose={() => setAuthPanelOpen(false)} onOpenAdmin={() => { setAuthPanelOpen(false); window.open("/admin/", "_blank", "noopener,noreferrer"); }} onOpenMusic={() => { setAuthPanelOpen(false); window.open("/admin/music/", "_blank", "noopener,noreferrer"); }} onOpenEditor={() => { setAuthPanelOpen(false); window.open("/editor/", "_blank", "noopener,noreferrer"); }} /> : null}
           <button className="header-user-button" type="button" aria-label="用户账户" title="用户账户" />
         </div>
         </div>
