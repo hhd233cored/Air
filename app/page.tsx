@@ -7,21 +7,12 @@ import { getChatterEntries, getChatterEntry, getLocalChatterEntry, getLocalChatt
 import { type HistoricalTodayEvent, getHistoricalToday } from "./lib/api/historical";
 import { getMusicPlaylist, getMusicTrackUrl, type MusicTrackSummary } from "./lib/api/music";
 import { type AuthUser, getCurrentUser } from "./lib/api/auth";
-import { AuthPanel } from "./components/AuthPanel";
 import { CommentsPanel } from "./components/CommentsPanel";
 import { highlightCode, languageKey, languageLabel, MarkdownRenderer } from "./components/MarkdownRenderer";
 import { MaintenancePage } from "./components/MaintenancePage";
+import { CoverCarousel, SiteHeader, type SitePageKey } from "./components/SiteChrome";
 
-type PageKey = "home" | "projects" | "article" | "chatter" | "guestbook";
-
-const navigation: { id: PageKey; label: string; index: string }[] = [
-  { id: "home", label: "Home", index: "01" },
-  { id: "article", label: "Article", index: "02" },
-  { id: "chatter", label: "Dairy", index: "03" },
-  { id: "guestbook", label: "Guestbook", index: "04" },
-];
-
-const coverImages = ["1.png", "2.jpg", "3.png","4.png","5.jpg","6.png","7.jpg","8.png","9.jpg"].sort((left, right) => Number.parseInt(left, 10) - Number.parseInt(right, 10));
+type PageKey = SitePageKey;
 
 const projects = [
   { title: "Luma Notes", type: "Product / 2026", description: "A quiet place for ideas, fragments, and the things worth keeping.", color: "lilac" },
@@ -357,82 +348,6 @@ function WeatherPanel() {
       {weather ? (
         <div className="calendar-weather__reading"><strong>{Math.round(weather.temperature)}°</strong><small>体感 {Math.round(weather.apparentTemperature)}° · 湿度 {weather.humidity}% · 风 {Math.round(weather.windSpeed)}km/h</small></div>
       ) : null}
-    </div>
-  );
-}
-
-function PageButton({ active, index, label, onClick }: { active: boolean; index: string; label: string; onClick: () => void }) {
-  return (
-    <button className={`page-button ${active ? "is-active" : ""}`} onClick={onClick} type="button" aria-current={active ? "page" : undefined}>
-      <span>{index}</span>
-      {label}
-    </button>
-  );
-}
-
-function CoverCarousel() {
-  const [trackIndex, setTrackIndex] = useState(0);
-  const [animateTrack, setAnimateTrack] = useState(true);
-  const activeIndex = trackIndex % coverImages.length;
-
-  useEffect(() => {
-    if (coverImages.length <= 1) return;
-    const timer = window.setInterval(() => {
-      setTrackIndex((index) => (index >= coverImages.length ? 0 : index + 1));
-    }, 5000);
-    return () => window.clearInterval(timer);
-  }, [trackIndex]);
-
-  useEffect(() => {
-    const recoverCarousel = () => {
-      if (document.visibilityState !== "visible") return;
-      setTrackIndex((index) => index >= coverImages.length ? index % coverImages.length : index);
-    };
-    document.addEventListener("visibilitychange", recoverCarousel);
-    window.addEventListener("pageshow", recoverCarousel);
-    return () => {
-      document.removeEventListener("visibilitychange", recoverCarousel);
-      window.removeEventListener("pageshow", recoverCarousel);
-    };
-  }, []);
-
-  const handleTrackTransitionEnd = (event: React.TransitionEvent<HTMLDivElement>) => {
-    if (event.propertyName !== "transform" || trackIndex !== coverImages.length) return;
-    setAnimateTrack(false);
-    setTrackIndex(0);
-    window.requestAnimationFrame(() => {
-      window.requestAnimationFrame(() => setAnimateTrack(true));
-    });
-  };
-
-  return (
-    <div className="cover-space" aria-label="顶部封面图片轮播">
-      <div className="cover-space__inner">
-        <div
-          className={`cover-space__track ${animateTrack ? "" : "is-resetting"}`}
-          style={{ "--cover-slide-index": trackIndex } as React.CSSProperties}
-          onTransitionEnd={handleTrackTransitionEnd}
-        >
-          {[...coverImages, coverImages[0]].map((image, index) => (
-            <img className="cover-space__image" src={`/picture/Cover/${image}`} alt={`顶部封面 ${index + 1}`} key={`${image}-${index}`} />
-          ))}
-        </div>
-        {coverImages.length > 1 ? (
-          <div className="cover-space__dots" aria-label="选择顶部封面">
-            {coverImages.map((image, index) => (
-              <button
-                className={`cover-space__dot ${index === activeIndex ? "is-active" : ""}`}
-                type="button"
-                key={image}
-                aria-label={`切换到第 ${index + 1} 张封面`}
-                aria-current={index === activeIndex ? "true" : undefined}
-                disabled={index === activeIndex}
-                onClick={() => { setAnimateTrack(true); setTrackIndex(index); }}
-              />
-            ))}
-          </div>
-        ) : null}
-      </div>
     </div>
   );
 }
@@ -1572,6 +1487,17 @@ function SiteApp() {
       .catch(() => setAuthUser(null));
   }, []);
 
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      const requestedPage = new URLSearchParams(window.location.search).get("page");
+      if (requestedPage === "article" || requestedPage === "chatter" || requestedPage === "guestbook") {
+        pendingNavigationScrollRef.current = true;
+        setActivePage(requestedPage);
+      }
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, []);
+
   const openContentPage = (page: PageKey) => {
     pendingNavigationScrollRef.current = true;
     setActivePage(page);
@@ -1644,29 +1570,16 @@ function SiteApp() {
       <div className="ambient ambient--two" aria-hidden="true" />
       <div className="ambient ambient--three" aria-hidden="true" />
       <CoverCarousel />
-      <header className="site-header">
-        <div className="site-header__inner shell">
-        <button className="brand brand-button" type="button" aria-label="返回主页" onClick={returnHomeToInitialPosition}><span>AirChord <i>/</i> StrInの小站</span></button>
-        <nav className="page-nav" aria-label="页面切换">
-          {navigation.map((item) => <PageButton key={item.id} active={activePage === item.id} index={item.index} label={item.label} onClick={() => { setActivePage(item.id); setSelectedArticleSlug(null); }} />)}
-        </nav>
-        <div className="header-status">
-          <button
-            className={`header-auth-button${authUser ? " is-authenticated" : ""}`}
-            type="button"
-            aria-label={authUser ? `${authUser.username}账户` : "登录"}
-            title={authUser ? `${authUser.username} · ${authUser.role}` : "登录"}
-            aria-expanded={authPanelOpen}
-            onClick={() => setAuthPanelOpen((open) => !open)}
-          >
-            {authUser?.avatarUrl ? <img src={resolveApiUrl(authUser.avatarUrl)} alt="" /> : authUser ? <span className="header-auth-button__empty" aria-hidden="true" /> : null}
-          </button>
-          {authUser ? <span className="header-auth-label"><strong>{authUser.username}</strong><small>{authUser.role}</small></span> : null}
-          {authPanelOpen ? <AuthPanel user={authUser} onUserChange={setAuthUser} onClose={() => setAuthPanelOpen(false)} onOpenAdmin={() => { setAuthPanelOpen(false); window.open("/admin/", "_blank", "noopener,noreferrer"); }} onOpenMusic={() => { setAuthPanelOpen(false); window.open("/admin/music/", "_blank", "noopener,noreferrer"); }} onOpenEditor={() => { setAuthPanelOpen(false); window.open("/editor/", "_blank", "noopener,noreferrer"); }} /> : null}
-          <button className="header-user-button" type="button" aria-label="用户账户" title="用户账户" />
-        </div>
-        </div>
-      </header>
+      <SiteHeader
+        activePage={activePage}
+        onBrandClick={returnHomeToInitialPosition}
+        onNavigate={openContentPage}
+        authUser={authUser}
+        authPanelOpen={authPanelOpen}
+        onToggleAuth={() => setAuthPanelOpen((open) => !open)}
+        onUserChange={setAuthUser}
+        onCloseAuth={() => setAuthPanelOpen(false)}
+      />
 
       <div className={`content-backdrop content-backdrop--${activePage === "article" && selectedArticleSlug ? "article-detail" : activePage}`}>
         {activePage === "article" && selectedArticleSlug ? <div className="content-backdrop__detail-background" aria-hidden="true" /> : null}

@@ -1,11 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Link from "next/link";
-import { AuthPanel } from "../components/AuthPanel";
 import { ArticleDetailView } from "../components/ArticleDetailView";
+import { CoverCarousel, SiteHeader, type SitePageKey } from "../components/SiteChrome";
 import { MaintenancePage } from "../components/MaintenancePage";
-import { resolveApiUrl } from "../lib/api/client";
 import { getCurrentUser, type AuthUser } from "../lib/api/auth";
 
 export default function ArticlePage() {
@@ -26,35 +24,55 @@ export default function ArticlePage() {
     return () => window.clearTimeout(slugTimer);
   }, []);
 
+  useEffect(() => {
+    let timer: number | undefined;
+    const applyNavigationScroll = () => {
+      const cover = document.querySelector<HTMLElement>(".cover-space");
+      const targetTop = cover?.offsetHeight ?? 0;
+      window.scrollTo(0, targetTop);
+      document.documentElement.scrollTop = targetTop;
+      document.body.scrollTop = targetTop;
+    };
+
+    const frame = window.requestAnimationFrame(() => {
+      applyNavigationScroll();
+      timer = window.setTimeout(applyNavigationScroll, 80);
+    });
+
+    return () => {
+      window.cancelAnimationFrame(frame);
+      if (timer !== undefined) window.clearTimeout(timer);
+    };
+  }, []);
+
   if (process.env.NEXT_PUBLIC_MAINTENANCE_MODE !== "false") return <MaintenancePage />;
 
   const goHome = () => window.location.assign("/");
+  const navigateFromArticle = (page: SitePageKey) => {
+    if (page === "home") {
+      goHome();
+      return;
+    }
+    if (page === "article") return;
+    window.location.assign(`/?page=${encodeURIComponent(page)}`);
+  };
 
   return (
     <main className="site-shell">
       <div className="ambient ambient--one" aria-hidden="true" />
       <div className="ambient ambient--two" aria-hidden="true" />
       <div className="ambient ambient--three" aria-hidden="true" />
-      <header className="site-header">
-        <div className="site-header__inner shell">
-          <Link className="brand" href="/" aria-label="返回主页">AirChord <i>/</i> StrIn 的小站</Link>
-          <div aria-hidden="true" />
-          <div className="header-status">
-            <button
-              className={`header-auth-button${authUser ? " is-authenticated" : ""}`}
-              type="button"
-              aria-label={authUser ? `${authUser.username} 账户` : "登录"}
-              title={authUser ? `${authUser.username} · ${authUser.role}` : "登录"}
-              aria-expanded={authPanelOpen}
-              onClick={() => setAuthPanelOpen((open) => !open)}
-            >
-              {authUser?.avatarUrl ? <img src={resolveApiUrl(authUser.avatarUrl)} alt="" /> : null}
-            </button>
-            {authUser ? <span className="header-auth-label"><strong>{authUser.username}</strong><small>{authUser.role}</small></span> : null}
-            {authPanelOpen ? <AuthPanel user={authUser} onUserChange={setAuthUser} onClose={() => setAuthPanelOpen(false)} onOpenAdmin={() => { setAuthPanelOpen(false); window.open("/admin/", "_blank", "noopener,noreferrer"); }} onOpenMusic={() => { setAuthPanelOpen(false); window.open("/admin/music/", "_blank", "noopener,noreferrer"); }} onOpenEditor={() => { setAuthPanelOpen(false); window.open("/editor/", "_blank", "noopener,noreferrer"); }} /> : null}
-          </div>
-        </div>
-      </header>
+      <CoverCarousel />
+      <SiteHeader
+        activePage="article"
+        onBrandClick={goHome}
+        onNavigate={navigateFromArticle}
+        authUser={authUser}
+        authPanelOpen={authPanelOpen}
+        onToggleAuth={() => setAuthPanelOpen((open) => !open)}
+        onUserChange={setAuthUser}
+        onCloseAuth={() => setAuthPanelOpen(false)}
+      />
 
       <div className="content-backdrop content-backdrop--article-detail">
         <div className="content-backdrop__detail-background" aria-hidden="true" />
