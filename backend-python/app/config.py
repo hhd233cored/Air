@@ -118,6 +118,7 @@ class Settings:
     music_max_upload_bytes: int
     cors_allowed_origins: tuple[str, ...]
     wikipedia_on_this_day_url: str
+    wikipedia_on_this_day_page_url: str
     netease_music_api_base_url: str
     netease_music_playlist_id: str
     netease_music_app_id: str
@@ -201,6 +202,10 @@ class Settings:
             wikipedia_on_this_day_url=os.getenv(
                 "WIKIPEDIA_ON_THIS_DAY_URL",
                 "https://api.wikimedia.org/feed/v1/wikipedia/zh/onthisday/all",
+            ).rstrip("/"),
+            wikipedia_on_this_day_page_url=os.getenv(
+                "WIKIPEDIA_ON_THIS_DAY_PAGE_URL",
+                "https://zh.wikipedia.org/wiki",
             ).rstrip("/"),
             netease_music_api_base_url=os.getenv(
                 "NETEASE_MUSIC_API_BASE_URL",

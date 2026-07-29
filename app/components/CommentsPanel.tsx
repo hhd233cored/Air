@@ -51,7 +51,16 @@ export function CommentsPanel({
       .then((result) => {
         if (!active) return;
         setCommentCount(result.totalElements);
-        if (open) setComments(result.content);
+        if (open) {
+          const content = targetType === "GUESTBOOK"
+            ? [...result.content].sort((left, right) => {
+                const rightTime = Date.parse(right.createdAt);
+                const leftTime = Date.parse(left.createdAt);
+                return (Number.isNaN(rightTime) ? 0 : rightTime) - (Number.isNaN(leftTime) ? 0 : leftTime) || right.id - left.id;
+              })
+            : result.content;
+          setComments(content);
+        }
       })
       .catch((reason) => {
         if (active) setError(reason instanceof ApiRequestError ? reason.message : "评论暂时无法加载");
@@ -129,7 +138,7 @@ export function CommentsPanel({
         </button>
       ) : (
         <button className="comments-panel__toggle" type="button" onClick={toggleOpen}>
-          <span>{targetType === "GUESTBOOK" ? "留言" : "评论"}</span>
+          <span>评论</span>
           <span>{open ? "−" : `${comments.length || ""} 条`}</span>
         </button>
       )}

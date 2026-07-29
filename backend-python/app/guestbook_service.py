@@ -72,7 +72,7 @@ class GuestbookService:
                 FROM guestbook_messages m
                 JOIN users u ON u.id = m.user_id
                 WHERE m.status = 'VISIBLE'
-                ORDER BY m.created_at ASC, m.id ASC
+                ORDER BY m.created_at DESC, m.id DESC
                 LIMIT ? OFFSET ?
                 """,
                 (size, page * size),

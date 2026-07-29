@@ -137,6 +137,7 @@ MUSIC_SOURCE=local
 MUSIC_CONTENT_DIR=./music
 CORS_ALLOWED_ORIGINS=http://localhost:3000,http://127.0.0.1:3000
 WIKIPEDIA_ON_THIS_DAY_URL=https://api.wikimedia.org/feed/v1/wikipedia/zh/onthisday/all
+WIKIPEDIA_ON_THIS_DAY_PAGE_URL=https://zh.wikipedia.org/wiki
 
 # 网易云音乐 OpenAPI（不要提交真实值）
 NETEASE_MUSIC_API_BASE_URL=https://openapi.music.163.com

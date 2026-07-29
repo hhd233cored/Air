@@ -316,10 +316,37 @@ function HistoricalTodayPanel({ now, marginTop }: { now: Date | null; marginTop?
       <div className="calendar-history__events">
         {events.map((event, index) => {
           const content = event.text ?? "";
+          const parts = event.parts?.length ? event.parts : [{ text: content }];
+          const yearLabel = event.year == null ? "—" : `${event.year}年`;
           return (
             <div className="calendar-history__event" key={`${content}-${index}`}>
-              <strong>{event.year ?? "—"}</strong>
-              <p>{content}</p>
+              <strong>
+                {event.yearHref ? (
+                  <a
+                    className="calendar-history__year-link"
+                    href={event.yearHref}
+                    rel="noreferrer noopener"
+                    target="_blank"
+                  >
+                    {yearLabel}
+                  </a>
+                ) : yearLabel}
+              </strong>
+              <p>
+                {parts.map((part, partIndex) => part.href ? (
+                  <a
+                    className="calendar-history__link"
+                    href={part.href}
+                    key={`${part.text}-${partIndex}`}
+                    rel="noreferrer noopener"
+                    target="_blank"
+                  >
+                    {part.text}
+                  </a>
+                ) : (
+                  <span key={`${part.text}-${partIndex}`}>{part.text}</span>
+                ))}
+              </p>
             </div>
           );
         })}

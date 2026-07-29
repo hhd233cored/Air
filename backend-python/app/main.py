@@ -66,7 +66,10 @@ content_store = (
 )
 article_service = DatabaseArticleService(content_store) if content_store is not None else ArticleService(settings.article_content_dir)
 chatter_service = DatabaseChatterService(content_store) if content_store is not None else ChatterService(settings.chatter_content_dir)
-historical_service = HistoricalTodayService(settings.wikipedia_on_this_day_url)
+historical_service = HistoricalTodayService(
+    settings.wikipedia_on_this_day_url,
+    settings.wikipedia_on_this_day_page_url,
+)
 auth_service = (
     AuthService(settings.auth_database_path, settings.auth_session_timeout_seconds, settings.auth_registration_enabled)
     if settings.auth_enabled

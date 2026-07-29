@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from datetime import date, datetime
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class ArticleSummary(BaseModel):
@@ -35,9 +35,16 @@ class ArticlePageResponse(BaseModel):
     totalPages: int
 
 
+class HistoricalTodayEventPart(BaseModel):
+    text: str
+    href: str | None = None
+
+
 class HistoricalTodayEvent(BaseModel):
     year: int | None
     text: str
+    parts: list[HistoricalTodayEventPart] = Field(default_factory=list)
+    yearHref: str | None = None
 
 
 class HistoricalTodayResponse(BaseModel):

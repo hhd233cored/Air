@@ -3,6 +3,13 @@ import { apiGet } from "./client";
 export type HistoricalTodayEvent = {
   year?: number;
   text?: string;
+  parts?: HistoricalTodayEventPart[];
+  yearHref?: string | null;
+};
+
+export type HistoricalTodayEventPart = {
+  text: string;
+  href?: string | null;
 };
 
 export type HistoricalTodayPayload = {

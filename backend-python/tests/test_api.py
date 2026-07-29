@@ -4,7 +4,7 @@ import asyncio
 import json
 import sys
 from dataclasses import replace
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from pathlib import Path
 
 from fastapi.testclient import TestClient
@@ -363,6 +363,63 @@ def test_historical_today_is_cached_for_the_current_hour(monkeypatch) -> None:
     assert first.events[0].year == 1789
     assert first.events[0].text == "A historical event"
     assert second == first
+
+
+def test_historical_today_repairs_empty_book_title_with_known_event_override() -> None:
+    service = HistoricalTodayService("https://example.test/onthisday/all")
+
+    events = service._parse_events(
+        {"events": [{"year": 1958, "text": "美國總統簽署《》，建立。"}]},
+        date(2026, 7, 29),
+    )
+
+    assert events[0].text == "美國總統簽署《美國國家航空暨太空法案》，建立美國國家航空暨太空總署（NASA）。"
+    assert events[0].parts[1].text == "美國國家航空暨太空法案"
+    assert events[0].parts[1].href == "https://zh.wikipedia.org/wiki/美國國家航空暨太空法案"
+
+
+def test_historical_today_links_page_title_when_it_occurs_in_event_text() -> None:
+    service = HistoricalTodayService("https://example.test/onthisday/all")
+
+    events = service._parse_events({
+        "events": [{
+            "year": 2010,
+            "text": "The Example Act was enacted.",
+            "pages": [{
+                "titles": {"display": "Example Act"},
+                "content_urls": {"desktop": {"page": "https://en.wikipedia.org/wiki/Example_Act"}},
+            }],
+        }],
+    })
+
+    assert [(part.text, part.href) for part in events[0].parts] == [
+        ("The ", None),
+        ("Example Act", "https://en.wikipedia.org/wiki/Example_Act"),
+        (" was enacted.", None),
+    ]
+
+
+def test_historical_today_parses_original_wikipedia_links_from_day_page() -> None:
+    service = HistoricalTodayService("https://example.test/onthisday/all")
+
+    events = service._parse_wikipedia_day_page(
+        """
+        <ul>
+          <li><a href="/wiki/1836%E5%B9%B4">1836年</a>：由法国皇帝<a href="/wiki/%E6%8B%BF%E7%A0%B4%E5%B4%99%E4%B8%80%E4%B8%96">拿破仑一世</a>下令兴建的<a href="/wiki/%E5%B7%B4%E9%BB%8E%E5%87%AF%E6%97%8B%E9%97%A8">巴黎凯旋门</a>举行落成典礼。</li>
+        </ul>
+        """,
+        "https://zh.wikipedia.org/wiki",
+    )
+
+    assert events[0].year == 1836
+    assert events[0].year_href == "https://zh.wikipedia.org/wiki/1836%E5%B9%B4"
+    assert [(part.text, part.href) for part in events[0].parts] == [
+        ("由法国皇帝", None),
+        ("拿破仑一世", "https://zh.wikipedia.org/wiki/%E6%8B%BF%E7%A0%B4%E5%B4%99%E4%B8%80%E4%B8%96"),
+        ("下令兴建的", None),
+        ("巴黎凯旋门", "https://zh.wikipedia.org/wiki/%E5%B7%B4%E9%BB%8E%E5%87%AF%E6%97%8B%E9%97%A8"),
+        ("举行落成典礼。", None),
+    ]
 
 
 def test_application_lifespan_warms_historical_cache(monkeypatch) -> None:

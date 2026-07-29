@@ -238,17 +238,20 @@ button:focus-visible { outline: 2px solid var(--mint); outline-offset: 3px; }
 .calendar-weather__icon { display: grid; width: 48px; height: 48px; flex: 0 0 auto; place-items: center; border: 1px solid rgb(79 157 150 / .2); border-radius: 13px; background: rgb(255 255 255 / .42); color: var(--mint); font-size: 23px; }
 .calendar-weather__reading { max-width: 52%; flex: 0 1 52%; flex-direction: column; align-items: end; gap: 3px; text-align: right; }
 .calendar-weather__reading strong { color: var(--text); font-size: 32px; font-weight: 450; letter-spacing: -.06em; line-height: .9; }
-.calendar-history { display: flex; min-height: 118px; flex-direction: column; gap: 10px; margin-top: auto; padding: 16px 24px 18px; border-top: 1px solid rgb(104 90 135 / .12); background: rgb(255 255 255 / .24); }
-.calendar-history__heading { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; }
+.calendar-history { display: flex; min-width: 0; min-height: 118px; flex-direction: column; gap: 10px; margin-top: auto; padding: 16px 24px 18px; border-top: 1px solid rgb(104 90 135 / .12); background: rgb(255 255 255 / .24); }
+.calendar-history__heading { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
 .calendar-history__heading strong, .calendar-history__heading span, .calendar-history__status, .calendar-history__events { font-family: SimSun, "宋体", serif; }
 .calendar-history__heading strong { color: var(--text); font-size: 17px; font-weight: 600; }
 .calendar-history__heading span, .calendar-history__status, .calendar-history__events { color: var(--muted); font-size: 11px; line-height: 1.5; }
 .calendar-history__heading span { font-size: 14px; }
 .calendar-history__status { margin: 0; }
-.calendar-history__events { display: grid; gap: 6px; min-height: 0; overflow: hidden; }
-.calendar-history__event { display: grid; grid-template-columns: 58px minmax(0, 1fr); align-items: start; gap: 2px; }
+.calendar-history__events { display: grid; flex: 1 1 auto; gap: 6px; min-width: 0; min-height: 0; margin-top: 3px; }
+.calendar-history__event { display: grid; grid-template-columns: 58px minmax(0, 1fr); align-items: start; gap: 2px; min-width: 0; }
 .calendar-history__event > strong { color: #2f62bd; font-family: SimSun, "宋体", serif; font-size: 13px; font-weight: 700; line-height: 1.55; }
-.calendar-history__event p { display: -webkit-box; max-height: 3.1em; overflow: hidden; margin: 0; color: #62576e; font-family: SimSun, "宋体", serif; font-size: 11px; line-height: 1.55; text-overflow: ellipsis; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
+.calendar-history__year-link { color: inherit; text-decoration: none; }
+.calendar-history__event p { display: -webkit-box; max-width: 100%; max-height: 4.65em; min-width: 0; overflow: hidden; margin: 0; color: #62576e; font-family: SimSun, "宋体", serif; font-size: 11px; line-height: 1.55; overflow-wrap: anywhere; text-overflow: ellipsis; -webkit-box-orient: vertical; -webkit-line-clamp: 3; }
+.calendar-history__link { color: #4169a8; text-decoration: none; }
+.calendar-history__link:hover { color: #254f93; }
 .diary-card .calendar-weather { position: relative; display: block; min-height: 125px; flex: 1 1 auto; margin-top: 0; padding: 0; border-top: 0; background: transparent; }
 .diary-card .calendar-weather__place { gap: 9px; }
 .diary-card .calendar-weather__place strong { font-size: 17px; }
