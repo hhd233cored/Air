@@ -216,7 +216,7 @@ button:focus-visible { outline: 2px solid var(--mint); outline-offset: 3px; }
 .now-line { height: 2px; margin-top: auto; overflow: hidden; background: rgb(104 90 135 / .13); }
 .now-line span { display: block; width: 42%; height: 100%; background: linear-gradient(90deg, var(--mint), var(--accent)); }
 .player-time { display: flex; justify-content: space-between; margin-top: 7px; color: var(--faint); font-family: var(--font-geist-mono), Consolas, monospace; font-size: 8px; }
-.calendar-card { display: flex; grid-column: span 4; min-height: 260px; flex-direction: column; padding: 0; overflow: hidden; background: rgb(255 255 255 / var(--card-opacity)); }
+.calendar-card { display: flex; grid-column: span 4; align-self: start; min-height: 260px; flex-direction: column; padding: 0; overflow: hidden; background: rgb(255 255 255 / var(--card-opacity)); }
 .calendar-card__month { display: grid; grid-template-columns: 23px 1fr 23px; align-items: center; gap: 10px; padding: 14px 19px; background: linear-gradient(90deg, #ff9188, #f5a5b5); color: white; font-family: var(--font-geist-mono), Consolas, monospace; font-size: 13px; letter-spacing: .04em; text-align: center; }
 .calendar-nav-button { display: grid; width: 23px; height: 23px; place-items: center; padding: 0; border: 0; border-radius: 0; background: transparent; color: white; font-size: 20px; line-height: 1; transition: transform .2s ease; }
 .calendar-nav-button:hover { background: transparent; transform: translateY(-1px); }
@@ -327,7 +327,7 @@ button:focus-visible { outline: 2px solid var(--mint); outline-offset: 3px; }
 .music-playlist-popover__track.is-unavailable { opacity: .55; }
 audio { display: none; }
 @keyframes music-disc-spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
-.feed-column { grid-column: span 8; display: flex; flex-direction: column; gap: 16px; }
+.feed-column { display: flex; grid-column: span 8; align-self: start; min-width: 0; flex-direction: column; gap: 16px; }
 .home-page-layer.is-hidden { display: none; }
 .posts-card { display: flex; flex: 1; min-height: 250px; flex-direction: column; }
 .article-list-card--home { --article-card-bar-height: 50px; width: calc(100% + 38px); min-width: calc(100% + 38px); max-width: none; height: auto; min-height: 0; flex: 1 0 auto; margin: 15px -19px -19px; padding: 16px 19px 17px; border-radius: 0 0 16px 16px; }

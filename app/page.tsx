@@ -791,8 +791,10 @@ function HomePage({ onPageChange, onOpenArticle, onOpenChatter, onOpenGuestbook,
 
     updateHistoryPosition();
     const resizeObserver = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(updateHistoryPosition);
+    // The calendar margin is derived from the chatter card. Observing the
+    // calendar itself creates a layout feedback loop because both cards share
+    // the same grid row and the calendar margin changes its own height.
     resizeObserver?.observe(chatterCard);
-    resizeObserver?.observe(calendarCard);
     window.addEventListener("resize", updateHistoryPosition);
     return () => {
       resizeObserver?.disconnect();
