@@ -271,7 +271,7 @@ function useLocalWeather() {
   return { weather, status };
 }
 
-function HistoricalTodayPanel({ now, marginTop }: { now: Date | null; marginTop?: number | null }) {
+function HistoricalTodayPanel({ now }: { now: Date | null }) {
   const reference = now ?? new Date(2026, 6, 13);
   const month = String(reference.getMonth() + 1).padStart(2, "0");
   const day = String(reference.getDate()).padStart(2, "0");
@@ -305,7 +305,7 @@ function HistoricalTodayPanel({ now, marginTop }: { now: Date | null; marginTop?
   }, [dateKey, hourKey]);
 
   return (
-    <section className="calendar-history" aria-label="历史上的今天" style={marginTop == null ? undefined : { marginTop: `${marginTop}px` }}>
+    <section className="calendar-history" aria-label="历史上的今天">
       <div className="calendar-history__heading">
         <strong>歷史上的今天</strong>
         <span>{dateLabel}</span>
@@ -421,7 +421,7 @@ function GlassHeader({ eyebrow, title, copy }: { eyebrow: string; title: string;
   );
 }
 
-function CalendarCard({ now, cardRef, historyMarginTop }: { now: Date | null; cardRef?: React.RefObject<HTMLElement | null>; historyMarginTop?: number | null }) {
+function CalendarCard({ now }: { now: Date | null }) {
   const today = now ?? new Date(2026, 6, 13);
   const [viewDate, setViewDate] = useState<Date | null>(null);
   const reference = viewDate ?? today;
@@ -441,7 +441,7 @@ function CalendarCard({ now, cardRef, historyMarginTop }: { now: Date | null; ca
     setViewDate(new Date(year, monthIndex + offset, 1));
   };
   return (
-    <article ref={cardRef} className="glass-card calendar-card dashboard-card">
+    <article className="glass-card calendar-card dashboard-card">
       <div className="calendar-card__month">
         <button className="calendar-nav-button" type="button" onClick={() => changeMonth(-1)} aria-label="查看上个月" title="上个月">‹</button>
         <span>{month}</span>
@@ -458,7 +458,7 @@ function CalendarCard({ now, cardRef, historyMarginTop }: { now: Date | null; ca
           );
         })}
       </div>
-      <HistoricalTodayPanel now={now} marginTop={historyMarginTop} />
+      <HistoricalTodayPanel now={now} />
     </article>
   );
 }
@@ -744,10 +744,6 @@ function HomeArticleCard({ article, onOpenArticle }: { article: ArticleSummary; 
 function HomePage({ onPageChange, onOpenArticle, onOpenChatter, onOpenGuestbook, now }: { onPageChange: (page: PageKey) => void; onOpenArticle: (slug: string) => void; onOpenChatter: () => void; onOpenGuestbook: () => void; now: Date | null }) {
   const [latestArticles, setLatestArticles] = useState<ArticleSummary[]>([]);
   const [chatterEntries, setChatterEntries] = useState<ChatterSummary[]>([]);
-  const chatterCardRef = useRef<HTMLElement | null>(null);
-  const calendarCardRef = useRef<HTMLElement | null>(null);
-  const [calendarHistoryMarginTop, setCalendarHistoryMarginTop] = useState<number | null>(null);
-
   useEffect(() => {
     let cancelled = false;
     getPublishedArticles(0, 3)
@@ -766,40 +762,6 @@ function HomePage({ onPageChange, onOpenArticle, onOpenChatter, onOpenGuestbook,
       });
 
     return () => { cancelled = true; };
-  }, []);
-
-  useEffect(() => {
-    const chatterCard = chatterCardRef.current;
-    const calendarCard = calendarCardRef.current;
-    const calendarGrid = calendarCard?.querySelector<HTMLElement>(".calendar-grid");
-    if (!chatterCard || !calendarCard || !calendarGrid) return;
-
-    const updateHistoryPosition = () => {
-      const chatterRect = chatterCard.getBoundingClientRect();
-      const calendarRect = calendarCard.getBoundingClientRect();
-      const gridRect = calendarGrid.getBoundingClientRect();
-
-      // On narrow layouts the cards stack vertically, so the history panel
-      // should keep its natural position instead of aligning to the article.
-      if (chatterRect.left <= calendarRect.right) {
-        setCalendarHistoryMarginTop(null);
-        return;
-      }
-
-      setCalendarHistoryMarginTop(Math.max(0, Math.round(chatterRect.top - gridRect.bottom)));
-    };
-
-    updateHistoryPosition();
-    const resizeObserver = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(updateHistoryPosition);
-    // The calendar margin is derived from the chatter card. Observing the
-    // calendar itself creates a layout feedback loop because both cards share
-    // the same grid row and the calendar margin changes its own height.
-    resizeObserver?.observe(chatterCard);
-    window.addEventListener("resize", updateHistoryPosition);
-    return () => {
-      resizeObserver?.disconnect();
-      window.removeEventListener("resize", updateHistoryPosition);
-    };
   }, []);
 
   useEffect(() => {
@@ -863,7 +825,7 @@ function HomePage({ onPageChange, onOpenArticle, onOpenChatter, onOpenGuestbook,
 
         <MusicPlayerBar compact />
 
-        <CalendarCard now={now} cardRef={calendarCardRef} historyMarginTop={calendarHistoryMarginTop} />
+        <CalendarCard now={now} />
 
         <div className="feed-column">
           <article className="glass-card posts-card dashboard-card">
@@ -872,7 +834,7 @@ function HomePage({ onPageChange, onOpenArticle, onOpenChatter, onOpenGuestbook,
           </article>
 
           <div className="dashboard-split">
-            <article ref={chatterCardRef} className="glass-card chatter-card dashboard-card">
+            <article className="glass-card chatter-card dashboard-card">
               <div className="card-heading">
                 <div><p className="card-kicker">Dairy</p><h2>最新说说</h2></div>
               </div>
