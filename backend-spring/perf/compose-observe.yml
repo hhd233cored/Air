@@ -1,0 +1,5 @@
+# 仅供本机隔离压测：把 RabbitMQ 管理 API 映射到 loopback，用于队列深度时间序列。
+services:
+  rabbitmq:
+    ports:
+      - "127.0.0.1:${PERF_RABBIT_MANAGEMENT_PORT:-18083}:15672"

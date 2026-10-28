@@ -1,0 +1,9 @@
+# Reuse the verified JDK/Maven cache and JRE from the preceding local campaign.
+FROM air-perf-pool-http-test:local AS build
+WORKDIR /workspace
+COPY pom.xml ./pom.xml
+COPY src ./src
+RUN ./mvnw --offline --batch-mode --no-transfer-progress -Dmaven.test.skip=true package
+
+FROM air-perf-pool-http:local AS runtime
+COPY --from=build --chown=10001:10001 /workspace/target/airchord-backend-0.1.0-SNAPSHOT.jar /app/app.jar

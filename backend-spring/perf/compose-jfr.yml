@@ -1,0 +1,8 @@
+# 仅用于隔离实验；JFR 配置不采集环境变量、系统属性或进程命令。
+services:
+  app:
+    environment:
+      JAVA_TOOL_OPTIONS: -XX:StartFlightRecording=name=article-perf,settings=/app/perf/article-safe.jfc,dumponexit=true,filename=/tmp/article-perf.jfr,maxsize=256m -Xlog:gc*,safepoint:file=/tmp/article-gc.log:time,uptime,level,tags
+    volumes:
+      - ./article-safe.jfc:/app/perf/article-safe.jfc:ro
+    stop_grace_period: 45s

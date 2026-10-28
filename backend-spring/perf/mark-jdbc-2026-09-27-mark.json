@@ -1,0 +1,1237 @@
+[
+  {
+    "round": 1,
+    "label": "mark-jdbc-r1-bg4-300-2026-09-27",
+    "http": {
+      "event": "comparison-result",
+      "scenario": "mixed",
+      "articleCount": 100,
+      "articleOffset": 801,
+      "requests": 291050,
+      "concurrency": 200,
+      "seconds": 300.25,
+      "rps": 969.4,
+      "statuses": {
+        "200": 145525,
+        "202": 145525
+      },
+      "outcomes": {
+        "changed": 291050
+      },
+      "p50Ms": 29.3,
+      "p95Ms": 175.3,
+      "p99Ms": 344.5
+    },
+    "steady": {
+      "event": "sustained-steady-window",
+      "scenario": "mixed",
+      "startSecond": 10,
+      "endSecond": 300,
+      "completedRequests": 284637,
+      "rps": 981.5068965517241,
+      "p50Ms": 28.9,
+      "p95Ms": 166.8,
+      "p99Ms": 336.6
+    },
+    "missPct": 2.983,
+    "wait": {
+      "event": "wait-summary",
+      "scenario": "mixed",
+      "samples": 619,
+      "probeFailures": 0,
+      "queueProbeFailures": 0,
+      "maxPoolActive": 16,
+      "maxPoolPending": 154,
+      "maxOutboxPending": 4181,
+      "maxQueueReady": 3234,
+      "maxQueueUnacked": 100,
+      "maxDbActive": 17,
+      "maxDbLockWait": 0,
+      "maxDbIoWait": 5,
+      "maxDbOtherWait": 14,
+      "maxBackgroundActive": 2,
+      "maxBackgroundPending": 0,
+      "observedDbWaitEvents": [
+        "Client:ClientRead",
+        "IO:AioIoCompletion",
+        "IO:DataFileExtend",
+        "IO:DataFileRead",
+        "IO:DataFileWrite",
+        "IO:WalSync",
+        "IO:WalWrite",
+        "LWLock:BufferContent",
+        "LWLock:CheckpointerComm",
+        "LWLock:WALInsert",
+        "LWLock:WALWrite",
+        "Timeout:SpinDelay",
+        "Timeout:VacuumDelay"
+      ],
+      "maxDbProbeMs": 367.775811,
+      "maxClientProbeMs": 439.5843809999933
+    },
+    "pipeline": {
+      "httpSeconds": 300.247,
+      "lastPublisherSeconds": 300.284,
+      "lastConsumerAckSeconds": 300.509,
+      "batchCompletionRps": 968.523,
+      "tailAfterHttpMs": 262,
+      "managementDrainSeconds": 338.861
+    },
+    "lag": {
+      "metricType": "ALL",
+      "events": 291050,
+      "published": 291050,
+      "processed": 291050,
+      "retried": 0,
+      "maxAttempts": 0,
+      "publishLagMs": {
+        "mean": 647.214,
+        "min": 42.365,
+        "p50": 266.118,
+        "p95": 3315.445,
+        "p99": 4262.175,
+        "max": 4588.34
+      },
+      "applyStartLagMs": {
+        "mean": 1027.638,
+        "min": 53.4,
+        "p50": 399.786,
+        "p95": 3575.939,
+        "p99": 4264.92,
+        "max": 4572.221
+      },
+      "applyBeforePublishedMark": 97406,
+      "negativeApplyStartLag": 0
+    },
+    "mark": {
+      "event": "mark-jdbc-summary",
+      "prefix": "target/mark-jdbc-r1-bg4-300-2026-09-27",
+      "checks": "PASS",
+      "batches": 1572,
+      "fullBatches": 933,
+      "counts": {
+        "borrowed": 1572,
+        "closed": 1572,
+        "prepareCalls": 1572,
+        "executeCalls": 1572,
+        "updatedRows": 291050,
+        "commitCalls": 1572,
+        "rollbackCalls": 0,
+        "prepareFailures": 0,
+        "executeFailures": 0,
+        "commitFailures": 0,
+        "rollbackFailures": 0,
+        "closeFailures": 0
+      },
+      "stages": {
+        "markMs": {
+          "samples": 1572,
+          "totalMs": 39372.129,
+          "avgMs": 25.046,
+          "p50Ms": 20.568,
+          "p95Ms": 49.006,
+          "p99Ms": 87.39,
+          "maxMs": 259.418
+        },
+        "acquireMs": {
+          "samples": 1572,
+          "totalMs": 14.379,
+          "avgMs": 0.009,
+          "p50Ms": 0.002,
+          "p95Ms": 0.003,
+          "p99Ms": 0.008,
+          "maxMs": 5.851
+        },
+        "holdMs": {
+          "samples": 1572,
+          "totalMs": 39251.432,
+          "avgMs": 24.969,
+          "p50Ms": 20.534,
+          "p95Ms": 48.916,
+          "p99Ms": 87.348,
+          "maxMs": 259.334
+        },
+        "prepareMs": {
+          "samples": 1572,
+          "totalMs": 33.901,
+          "avgMs": 0.022,
+          "p50Ms": 0.011,
+          "p95Ms": 0.065,
+          "p99Ms": 0.189,
+          "maxMs": 1.895
+        },
+        "executeMs": {
+          "samples": 1572,
+          "totalMs": 21723.07,
+          "avgMs": 13.819,
+          "p50Ms": 10.669,
+          "p95Ms": 34.176,
+          "p99Ms": 51.916,
+          "maxMs": 89.318
+        },
+        "commitMs": {
+          "samples": 1572,
+          "totalMs": 16991.38,
+          "avgMs": 10.809,
+          "p50Ms": 8.56,
+          "p95Ms": 16.959,
+          "p99Ms": 61.466,
+          "maxMs": 252.008
+        },
+        "closeMs": {
+          "samples": 1572,
+          "totalMs": 18.774,
+          "avgMs": 0.012,
+          "p50Ms": 0.008,
+          "p95Ms": 0.019,
+          "p99Ms": 0.075,
+          "maxMs": 0.954
+        },
+        "otherHoldMs": {
+          "samples": 1572,
+          "totalMs": 484.306,
+          "avgMs": 0.308,
+          "p50Ms": 0.229,
+          "p95Ms": 0.698,
+          "p99Ms": 1.392,
+          "maxMs": 13.126
+        },
+        "outsideLeaseMs": {
+          "samples": 1572,
+          "totalMs": 106.318,
+          "avgMs": 0.068,
+          "p50Ms": 0.04,
+          "p95Ms": 0.112,
+          "p99Ms": 0.27,
+          "maxMs": 22.681000000000004
+        }
+      },
+      "fullBatch": {
+        "markMs": {
+          "samples": 933,
+          "totalMs": 27138.213,
+          "avgMs": 29.087,
+          "p50Ms": 23.916,
+          "p95Ms": 58.179,
+          "p99Ms": 115.474,
+          "maxMs": 259.418
+        },
+        "acquireMs": {
+          "samples": 933,
+          "totalMs": 10.983,
+          "avgMs": 0.012,
+          "p50Ms": 0.002,
+          "p95Ms": 0.003,
+          "p99Ms": 0.007,
+          "maxMs": 5.851
+        },
+        "holdMs": {
+          "samples": 933,
+          "totalMs": 27072.948,
+          "avgMs": 29.017,
+          "p50Ms": 23.858,
+          "p95Ms": 58.081,
+          "p99Ms": 115.412,
+          "maxMs": 259.334
+        },
+        "prepareMs": {
+          "samples": 933,
+          "totalMs": 17.15,
+          "avgMs": 0.018,
+          "p50Ms": 0.011,
+          "p95Ms": 0.03,
+          "p99Ms": 0.166,
+          "maxMs": 1.895
+        },
+        "executeMs": {
+          "samples": 933,
+          "totalMs": 15495.07,
+          "avgMs": 16.608,
+          "p50Ms": 13.581,
+          "p95Ms": 40.173,
+          "p99Ms": 54.467,
+          "maxMs": 89.318
+        },
+        "commitMs": {
+          "samples": 933,
+          "totalMs": 11227.962,
+          "avgMs": 12.034,
+          "p50Ms": 8.998,
+          "p95Ms": 20.068,
+          "p99Ms": 89.984,
+          "maxMs": 252.008
+        },
+        "closeMs": {
+          "samples": 933,
+          "totalMs": 12.732,
+          "avgMs": 0.014,
+          "p50Ms": 0.009,
+          "p95Ms": 0.02,
+          "p99Ms": 0.077,
+          "maxMs": 0.954
+        },
+        "otherHoldMs": {
+          "samples": 933,
+          "totalMs": 320.033,
+          "avgMs": 0.343,
+          "p50Ms": 0.239,
+          "p95Ms": 0.845,
+          "p99Ms": 1.841,
+          "maxMs": 13.126
+        },
+        "outsideLeaseMs": {
+          "samples": 933,
+          "totalMs": 54.282,
+          "avgMs": 0.058,
+          "p50Ms": 0.042,
+          "p95Ms": 0.123,
+          "p99Ms": 0.307,
+          "maxMs": 2.064
+        }
+      }
+    },
+    "phases": [
+      {
+        "from": 0,
+        "to": 10,
+        "batches": 28,
+        "fullBatches": 27,
+        "rows": 5422,
+        "markMs": 45.214,
+        "acquireMs": 0.402,
+        "sqlMs": 20.801,
+        "commitMs": 21.189,
+        "sqlP95Ms": 31.657,
+        "commitP95Ms": 89.984,
+        "outboxMax": 1242,
+        "backgroundPendingMax": 0
+      },
+      {
+        "from": 10,
+        "to": 30,
+        "batches": 99,
+        "fullBatches": 85,
+        "rows": 19290,
+        "markMs": 31.939,
+        "acquireMs": 0.002,
+        "sqlMs": 19.485,
+        "commitMs": 11.863,
+        "sqlP95Ms": 35.549,
+        "commitP95Ms": 23.449,
+        "outboxMax": 1367,
+        "backgroundPendingMax": 0
+      },
+      {
+        "from": 30,
+        "to": 60,
+        "batches": 170,
+        "fullBatches": 64,
+        "rows": 30035,
+        "markMs": 21.304,
+        "acquireMs": 0.002,
+        "sqlMs": 12.565,
+        "commitMs": 8.281,
+        "sqlP95Ms": 20.31,
+        "commitP95Ms": 12.719,
+        "outboxMax": 635,
+        "backgroundPendingMax": 0
+      },
+      {
+        "from": 60,
+        "to": 80,
+        "batches": 108,
+        "fullBatches": 60,
+        "rows": 19993,
+        "markMs": 24.736,
+        "acquireMs": 0.002,
+        "sqlMs": 15.088,
+        "commitMs": 9.284,
+        "sqlP95Ms": 24.563,
+        "commitP95Ms": 12.575,
+        "outboxMax": 599,
+        "backgroundPendingMax": 0
+      },
+      {
+        "from": 80,
+        "to": 120,
+        "batches": 215,
+        "fullBatches": 130,
+        "rows": 39357,
+        "markMs": 28.389,
+        "acquireMs": 0.002,
+        "sqlMs": 18.193,
+        "commitMs": 9.844,
+        "sqlP95Ms": 29.274,
+        "commitP95Ms": 14.241,
+        "outboxMax": 838,
+        "backgroundPendingMax": 0
+      },
+      {
+        "from": 120,
+        "to": 180,
+        "batches": 294,
+        "fullBatches": 245,
+        "rows": 57049,
+        "markMs": 34.2,
+        "acquireMs": 0.002,
+        "sqlMs": 21.343,
+        "commitMs": 12.447,
+        "sqlP95Ms": 50.119,
+        "commitP95Ms": 21.339,
+        "outboxMax": 4181,
+        "backgroundPendingMax": 0
+      },
+      {
+        "from": 180,
+        "to": 300,
+        "batches": 656,
+        "fullBatches": 322,
+        "rows": 119609,
+        "markMs": 18.997,
+        "acquireMs": 0.002,
+        "sqlMs": 7.997,
+        "commitMs": 10.703,
+        "sqlP95Ms": 13.825,
+        "commitP95Ms": 14.92,
+        "outboxMax": 1226,
+        "backgroundPendingMax": 0
+      }
+    ],
+    "peaks": [
+      {
+        "second": 225.597,
+        "rows": 200,
+        "markMs": 259.418,
+        "acquireMs": 0.009,
+        "sqlMs": 7.063,
+        "commitMs": 252.008,
+        "otherHoldMs": 0.245,
+        "outsideLeaseMs": 0.075,
+        "outbox": 304,
+        "probeOffsetMs": -115,
+        "walInterval": {
+          "from": 223.858,
+          "to": 228.98,
+          "fsyncAvgMs": 5.775,
+          "checkpointIoWriteMs": 0.527
+        }
+      },
+      {
+        "second": 240.956,
+        "rows": 200,
+        "markMs": 255.109,
+        "acquireMs": 0.002,
+        "sqlMs": 5.825,
+        "commitMs": 248.971,
+        "otherHoldMs": 0.234,
+        "outsideLeaseMs": 0.06,
+        "outbox": 176,
+        "probeOffsetMs": -191,
+        "walInterval": {
+          "from": 239.678,
+          "to": 245.533,
+          "fsyncAvgMs": 5.686,
+          "checkpointIoWriteMs": 1.561
+        }
+      },
+      {
+        "second": 7.513,
+        "rows": 200,
+        "markMs": 213.706,
+        "acquireMs": 0.002,
+        "sqlMs": 17.398,
+        "commitMs": 194.682,
+        "otherHoldMs": 0.91,
+        "outsideLeaseMs": 0.684,
+        "outbox": 896,
+        "probeOffsetMs": 238,
+        "walInterval": {
+          "from": 4.839,
+          "to": 10.3,
+          "fsyncAvgMs": 5.847,
+          "checkpointIoWriteMs": 0
+        }
+      },
+      {
+        "second": 155.888,
+        "rows": 200,
+        "markMs": 191.657,
+        "acquireMs": 0.002,
+        "sqlMs": 36.426,
+        "commitMs": 154.875,
+        "otherHoldMs": 0.263,
+        "outsideLeaseMs": 0.069,
+        "outbox": 3709,
+        "probeOffsetMs": -152,
+        "walInterval": {
+          "from": 154.633,
+          "to": 159.806,
+          "fsyncAvgMs": 5.468,
+          "checkpointIoWriteMs": 0
+        }
+      },
+      {
+        "second": 264.295,
+        "rows": 159,
+        "markMs": 188.981,
+        "acquireMs": 0.003,
+        "sqlMs": 5.676,
+        "commitMs": 182.872,
+        "otherHoldMs": 0.32,
+        "outsideLeaseMs": 0.081,
+        "outbox": 264,
+        "probeOffsetMs": -200,
+        "walInterval": {
+          "from": 261.451,
+          "to": 266.908,
+          "fsyncAvgMs": 5.123,
+          "checkpointIoWriteMs": 0.178
+        }
+      },
+      {
+        "second": 143.375,
+        "rows": 200,
+        "markMs": 174.571,
+        "acquireMs": 0.003,
+        "sqlMs": 51.916,
+        "commitMs": 122.316,
+        "otherHoldMs": 0.255,
+        "outsideLeaseMs": 0.056,
+        "outbox": 291,
+        "probeOffsetMs": -363,
+        "walInterval": {
+          "from": 138.738,
+          "to": 144.041,
+          "fsyncAvgMs": 4.873,
+          "checkpointIoWriteMs": 0
+        }
+      },
+      {
+        "second": 198.685,
+        "rows": 200,
+        "markMs": 172.7,
+        "acquireMs": 0.001,
+        "sqlMs": 5.571,
+        "commitMs": 166.904,
+        "otherHoldMs": 0.17,
+        "outsideLeaseMs": 0.04,
+        "outbox": 325,
+        "probeOffsetMs": -299,
+        "walInterval": {
+          "from": 197.282,
+          "to": 202.514,
+          "fsyncAvgMs": 5.382,
+          "checkpointIoWriteMs": 0.299
+        }
+      },
+      {
+        "second": 103.989,
+        "rows": 200,
+        "markMs": 172.149,
+        "acquireMs": 0.003,
+        "sqlMs": 19.02,
+        "commitMs": 152.816,
+        "otherHoldMs": 0.244,
+        "outsideLeaseMs": 0.038,
+        "outbox": 360,
+        "probeOffsetMs": -182,
+        "walInterval": {
+          "from": 101.154,
+          "to": 106.265,
+          "fsyncAvgMs": 5.065,
+          "checkpointIoWriteMs": 0
+        }
+      }
+    ],
+    "sqlPeaks": [
+      {
+        "second": 64.07,
+        "rows": 200,
+        "markMs": 100.006,
+        "acquireMs": 0.003,
+        "sqlMs": 89.318,
+        "commitMs": 10.289,
+        "otherHoldMs": 0.28,
+        "outsideLeaseMs": 0.067,
+        "outbox": 325,
+        "probeOffsetMs": -1,
+        "walInterval": {
+          "from": 63.538,
+          "to": 68.97,
+          "fsyncAvgMs": 4.886,
+          "checkpointIoWriteMs": 0
+        }
+      },
+      {
+        "second": 151.992,
+        "rows": 200,
+        "markMs": 78.935,
+        "acquireMs": 0.002,
+        "sqlMs": 69.937,
+        "commitMs": 8.69,
+        "otherHoldMs": 0.236,
+        "outsideLeaseMs": 0.04,
+        "outbox": 3097,
+        "probeOffsetMs": 312,
+        "walInterval": {
+          "from": 149.248,
+          "to": 154.633,
+          "fsyncAvgMs": 5.927,
+          "checkpointIoWriteMs": 0
+        }
+      },
+      {
+        "second": 94.83,
+        "rows": 200,
+        "markMs": 79.883,
+        "acquireMs": 0.003,
+        "sqlMs": 69.253,
+        "commitMs": 10.065,
+        "otherHoldMs": 0.373,
+        "outsideLeaseMs": 0.139,
+        "outbox": 456,
+        "probeOffsetMs": 225,
+        "walInterval": {
+          "from": 90.629,
+          "to": 96.273,
+          "fsyncAvgMs": 5.454,
+          "checkpointIoWriteMs": 0
+        }
+      }
+    ],
+    "outboxPeak": {
+      "second": 160.861,
+      "value": 4181
+    },
+    "walFsyncAvgMs": 4.964,
+    "jfr": {
+      "gc": {
+        "events": 102,
+        "aggregateMs": 1347.313,
+        "maxEventMs": 26.163
+      },
+      "articleBackgroundPark": {
+        "events": 0,
+        "aggregateMs": 0,
+        "maxEventMs": null
+      }
+    },
+    "pgFailures": 0
+  },
+  {
+    "round": 2,
+    "label": "mark-jdbc-r2-bg4-300-2026-09-27",
+    "http": {
+      "event": "comparison-result",
+      "scenario": "mixed",
+      "articleCount": 100,
+      "articleOffset": 901,
+      "requests": 297172,
+      "concurrency": 200,
+      "seconds": 300.05,
+      "rps": 990.4,
+      "statuses": {
+        "200": 148586,
+        "202": 148586
+      },
+      "outcomes": {
+        "changed": 297172
+      },
+      "p50Ms": 19.3,
+      "p95Ms": 60.2,
+      "p99Ms": 168.6
+    },
+    "steady": {
+      "event": "sustained-steady-window",
+      "scenario": "mixed",
+      "startSecond": 10,
+      "endSecond": 300,
+      "completedRequests": 287462,
+      "rps": 991.248275862069,
+      "p50Ms": 19.2,
+      "p95Ms": 52.1,
+      "p99Ms": 167.8
+    },
+    "missPct": 0.943,
+    "wait": {
+      "event": "wait-summary",
+      "scenario": "mixed",
+      "samples": 638,
+      "probeFailures": 0,
+      "queueProbeFailures": 0,
+      "maxPoolActive": 16,
+      "maxPoolPending": 167,
+      "maxOutboxPending": 1958,
+      "maxQueueReady": 416,
+      "maxQueueUnacked": 100,
+      "maxDbActive": 16,
+      "maxDbLockWait": 0,
+      "maxDbIoWait": 2,
+      "maxDbOtherWait": 14,
+      "maxBackgroundActive": 2,
+      "maxBackgroundPending": 0,
+      "observedDbWaitEvents": [
+        "Client:ClientRead",
+        "IO:DataFileRead",
+        "IO:DataFileWrite",
+        "IO:WalSync",
+        "IO:WalWrite",
+        "LWLock:BufferContent",
+        "LWLock:ProcArray",
+        "LWLock:WALInsert",
+        "LWLock:WALWrite",
+        "Timeout:VacuumDelay"
+      ],
+      "maxDbProbeMs": 133.074876,
+      "maxClientProbeMs": 1891.0712860000203
+    },
+    "pipeline": {
+      "httpSeconds": 300.053,
+      "lastPublisherSeconds": 300.102,
+      "lastConsumerAckSeconds": 300.285,
+      "batchCompletionRps": 989.633,
+      "tailAfterHttpMs": 232,
+      "managementDrainSeconds": 336.448
+    },
+    "lag": {
+      "metricType": "ALL",
+      "events": 297172,
+      "published": 297172,
+      "processed": 297172,
+      "retried": 0,
+      "maxAttempts": 0,
+      "publishLagMs": {
+        "mean": 214.545,
+        "min": 33.409,
+        "p50": 171.336,
+        "p95": 373.875,
+        "p99": 1746.007,
+        "max": 2140.643
+      },
+      "applyStartLagMs": {
+        "mean": 257.386,
+        "min": 42.019,
+        "p50": 211.403,
+        "p95": 477.712,
+        "p99": 1740.633,
+        "max": 2115.816
+      },
+      "applyBeforePublishedMark": 117134,
+      "negativeApplyStartLag": 0
+    },
+    "mark": {
+      "event": "mark-jdbc-summary",
+      "prefix": "target/mark-jdbc-r2-bg4-300-2026-09-27",
+      "checks": "PASS",
+      "batches": 1696,
+      "fullBatches": 324,
+      "counts": {
+        "borrowed": 1696,
+        "closed": 1696,
+        "prepareCalls": 1696,
+        "executeCalls": 1696,
+        "updatedRows": 297172,
+        "commitCalls": 1696,
+        "rollbackCalls": 0,
+        "prepareFailures": 0,
+        "executeFailures": 0,
+        "commitFailures": 0,
+        "rollbackFailures": 0,
+        "closeFailures": 0
+      },
+      "stages": {
+        "markMs": {
+          "samples": 1696,
+          "totalMs": 32181.953,
+          "avgMs": 18.975,
+          "p50Ms": 16.943,
+          "p95Ms": 29.012,
+          "p99Ms": 53.971,
+          "maxMs": 300.631
+        },
+        "acquireMs": {
+          "samples": 1696,
+          "totalMs": 3.306,
+          "avgMs": 0.002,
+          "p50Ms": 0.001,
+          "p95Ms": 0.002,
+          "p99Ms": 0.003,
+          "maxMs": 1.349
+        },
+        "holdMs": {
+          "samples": 1696,
+          "totalMs": 32100.28,
+          "avgMs": 18.927,
+          "p50Ms": 16.911,
+          "p95Ms": 28.949,
+          "p99Ms": 53.935,
+          "maxMs": 300.6
+        },
+        "prepareMs": {
+          "samples": 1696,
+          "totalMs": 28.679,
+          "avgMs": 0.017,
+          "p50Ms": 0.009,
+          "p95Ms": 0.055,
+          "p99Ms": 0.125,
+          "maxMs": 2.215
+        },
+        "executeMs": {
+          "samples": 1696,
+          "totalMs": 17057.016,
+          "avgMs": 10.057,
+          "p50Ms": 9.233,
+          "p95Ms": 17.993,
+          "p99Ms": 26.913,
+          "maxMs": 54.37
+        },
+        "commitMs": {
+          "samples": 1696,
+          "totalMs": 14619.939,
+          "avgMs": 8.62,
+          "p50Ms": 7.182,
+          "p95Ms": 12.099,
+          "p99Ms": 46.108,
+          "maxMs": 292.291
+        },
+        "closeMs": {
+          "samples": 1696,
+          "totalMs": 14.777,
+          "avgMs": 0.009,
+          "p50Ms": 0.006,
+          "p95Ms": 0.016,
+          "p99Ms": 0.055,
+          "maxMs": 0.749
+        },
+        "otherHoldMs": {
+          "samples": 1696,
+          "totalMs": 379.86,
+          "avgMs": 0.224,
+          "p50Ms": 0.179,
+          "p95Ms": 0.404,
+          "p99Ms": 0.837,
+          "maxMs": 11.864
+        },
+        "outsideLeaseMs": {
+          "samples": 1696,
+          "totalMs": 78.367,
+          "avgMs": 0.046,
+          "p50Ms": 0.035,
+          "p95Ms": 0.088,
+          "p99Ms": 0.243,
+          "maxMs": 3.6970000000000027
+        }
+      },
+      "fullBatch": {
+        "markMs": {
+          "samples": 324,
+          "totalMs": 7638.275,
+          "avgMs": 23.575,
+          "p50Ms": 21.724,
+          "p95Ms": 37.741,
+          "p99Ms": 64.709,
+          "maxMs": 182.478
+        },
+        "acquireMs": {
+          "samples": 324,
+          "totalMs": 0.446,
+          "avgMs": 0.001,
+          "p50Ms": 0.001,
+          "p95Ms": 0.002,
+          "p99Ms": 0.005,
+          "maxMs": 0.078
+        },
+        "holdMs": {
+          "samples": 324,
+          "totalMs": 7619.147,
+          "avgMs": 23.516,
+          "p50Ms": 21.673,
+          "p95Ms": 37.646,
+          "p99Ms": 64.681,
+          "maxMs": 182.43
+        },
+        "prepareMs": {
+          "samples": 324,
+          "totalMs": 5.079,
+          "avgMs": 0.016,
+          "p50Ms": 0.009,
+          "p95Ms": 0.028,
+          "p99Ms": 0.135,
+          "maxMs": 0.539
+        },
+        "executeMs": {
+          "samples": 324,
+          "totalMs": 4515.962,
+          "avgMs": 13.938,
+          "p50Ms": 12.857,
+          "p95Ms": 23.448,
+          "p99Ms": 34.209,
+          "maxMs": 54.37
+        },
+        "commitMs": {
+          "samples": 324,
+          "totalMs": 2996.467,
+          "avgMs": 9.248,
+          "p50Ms": 7.85,
+          "p95Ms": 12.903,
+          "p99Ms": 46.108,
+          "maxMs": 171.889
+        },
+        "closeMs": {
+          "samples": 324,
+          "totalMs": 3.498,
+          "avgMs": 0.011,
+          "p50Ms": 0.006,
+          "p95Ms": 0.019,
+          "p99Ms": 0.031,
+          "maxMs": 0.749
+        },
+        "otherHoldMs": {
+          "samples": 324,
+          "totalMs": 98.134,
+          "avgMs": 0.303,
+          "p50Ms": 0.2,
+          "p95Ms": 0.703,
+          "p99Ms": 2.193,
+          "maxMs": 6.829
+        },
+        "outsideLeaseMs": {
+          "samples": 324,
+          "totalMs": 18.682,
+          "avgMs": 0.058,
+          "p50Ms": 0.037,
+          "p95Ms": 0.139,
+          "p99Ms": 0.504,
+          "maxMs": 1.3820000000000014
+        }
+      }
+    },
+    "phases": [
+      {
+        "from": 0,
+        "to": 10,
+        "batches": 48,
+        "fullBatches": 47,
+        "rows": 9445,
+        "markMs": 29.675,
+        "acquireMs": 0.029,
+        "sqlMs": 18.857,
+        "commitMs": 9.544,
+        "sqlP95Ms": 32.936,
+        "commitP95Ms": 12.364,
+        "outboxMax": 1958,
+        "backgroundPendingMax": 0
+      },
+      {
+        "from": 10,
+        "to": 30,
+        "batches": 116,
+        "fullBatches": 17,
+        "rows": 20106,
+        "markMs": 16.243,
+        "acquireMs": 0.001,
+        "sqlMs": 7.776,
+        "commitMs": 8.073,
+        "sqlP95Ms": 13.724,
+        "commitP95Ms": 12.722,
+        "outboxMax": 283,
+        "backgroundPendingMax": 0
+      },
+      {
+        "from": 30,
+        "to": 60,
+        "batches": 175,
+        "fullBatches": 17,
+        "rows": 29988,
+        "markMs": 15.196,
+        "acquireMs": 0.001,
+        "sqlMs": 8.614,
+        "commitMs": 6.252,
+        "sqlP95Ms": 13.31,
+        "commitP95Ms": 9.138,
+        "outboxMax": 281,
+        "backgroundPendingMax": 0
+      },
+      {
+        "from": 60,
+        "to": 80,
+        "batches": 114,
+        "fullBatches": 14,
+        "rows": 19936,
+        "markMs": 16.441,
+        "acquireMs": 0.001,
+        "sqlMs": 10.153,
+        "commitMs": 6.017,
+        "sqlP95Ms": 17.038,
+        "commitP95Ms": 9.258,
+        "outboxMax": 427,
+        "backgroundPendingMax": 0
+      },
+      {
+        "from": 80,
+        "to": 120,
+        "batches": 228,
+        "fullBatches": 30,
+        "rows": 40049,
+        "markMs": 18.958,
+        "acquireMs": 0.001,
+        "sqlMs": 11.217,
+        "commitMs": 7.486,
+        "sqlP95Ms": 16.784,
+        "commitP95Ms": 10.704,
+        "outboxMax": 418,
+        "backgroundPendingMax": 0
+      },
+      {
+        "from": 120,
+        "to": 180,
+        "batches": 344,
+        "fullBatches": 64,
+        "rows": 59857,
+        "markMs": 20.118,
+        "acquireMs": 0.001,
+        "sqlMs": 11.665,
+        "commitMs": 8.175,
+        "sqlP95Ms": 18.872,
+        "commitP95Ms": 11.18,
+        "outboxMax": 429,
+        "backgroundPendingMax": 0
+      },
+      {
+        "from": 180,
+        "to": 300,
+        "batches": 670,
+        "fullBatches": 135,
+        "rows": 117677,
+        "markMs": 19.526,
+        "acquireMs": 0.001,
+        "sqlMs": 8.964,
+        "commitMs": 10.331,
+        "sqlP95Ms": 17.141,
+        "commitP95Ms": 13.01,
+        "outboxMax": 734,
+        "backgroundPendingMax": 0
+      }
+    ],
+    "peaks": [
+      {
+        "second": 265.248,
+        "rows": 155,
+        "markMs": 300.631,
+        "acquireMs": 0.001,
+        "sqlMs": 8.187,
+        "commitMs": 292.291,
+        "otherHoldMs": 0.114,
+        "outsideLeaseMs": 0.03,
+        "outbox": 163,
+        "probeOffsetMs": -428,
+        "walInterval": {
+          "from": 263.251,
+          "to": 268.466,
+          "fsyncAvgMs": 4.58,
+          "checkpointIoWriteMs": 0.058
+        }
+      },
+      {
+        "second": 273.389,
+        "rows": 170,
+        "markMs": 201.739,
+        "acquireMs": 0.001,
+        "sqlMs": 7.579,
+        "commitMs": 193.986,
+        "otherHoldMs": 0.137,
+        "outsideLeaseMs": 0.025,
+        "outbox": 121,
+        "probeOffsetMs": -95,
+        "walInterval": {
+          "from": 268.466,
+          "to": 274.053,
+          "fsyncAvgMs": 4.321,
+          "checkpointIoWriteMs": 0.271
+        }
+      },
+      {
+        "second": 281.623,
+        "rows": 200,
+        "markMs": 182.478,
+        "acquireMs": 0.001,
+        "sqlMs": 10.34,
+        "commitMs": 171.889,
+        "otherHoldMs": 0.187,
+        "outsideLeaseMs": 0.047,
+        "outbox": 197,
+        "probeOffsetMs": -118,
+        "walInterval": {
+          "from": 279.306,
+          "to": 284.739,
+          "fsyncAvgMs": 4.776,
+          "checkpointIoWriteMs": 0.041
+        }
+      },
+      {
+        "second": 292.317,
+        "rows": 186,
+        "markMs": 179.064,
+        "acquireMs": 0.001,
+        "sqlMs": 15.119,
+        "commitMs": 163.305,
+        "otherHoldMs": 0.569,
+        "outsideLeaseMs": 0.049,
+        "outbox": 218,
+        "probeOffsetMs": -30,
+        "walInterval": {
+          "from": 290.216,
+          "to": 295.795,
+          "fsyncAvgMs": 4.838,
+          "checkpointIoWriteMs": 0
+        }
+      },
+      {
+        "second": 273.058,
+        "rows": 196,
+        "markMs": 164.445,
+        "acquireMs": 0.001,
+        "sqlMs": 19.471,
+        "commitMs": 144.793,
+        "otherHoldMs": 0.139,
+        "outsideLeaseMs": 0.031,
+        "outbox": 121,
+        "probeOffsetMs": 236,
+        "walInterval": {
+          "from": 268.466,
+          "to": 274.053,
+          "fsyncAvgMs": 4.321,
+          "checkpointIoWriteMs": 0.271
+        }
+      },
+      {
+        "second": 173.582,
+        "rows": 131,
+        "markMs": 164.203,
+        "acquireMs": 0.001,
+        "sqlMs": 3.446,
+        "commitMs": 160.513,
+        "otherHoldMs": 0.143,
+        "outsideLeaseMs": 0.085,
+        "outbox": 95,
+        "probeOffsetMs": 210,
+        "walInterval": {
+          "from": 172.732,
+          "to": 178.015,
+          "fsyncAvgMs": 4.839,
+          "checkpointIoWriteMs": 0
+        }
+      },
+      {
+        "second": 299.001,
+        "rows": 191,
+        "markMs": 148.193,
+        "acquireMs": 0.001,
+        "sqlMs": 12.953,
+        "commitMs": 135.013,
+        "otherHoldMs": 0.171,
+        "outsideLeaseMs": 0.038,
+        "outbox": 111,
+        "probeOffsetMs": 176,
+        "walInterval": {
+          "from": 295.795,
+          "to": 300.772,
+          "fsyncAvgMs": 5.059,
+          "checkpointIoWriteMs": 2.064
+        }
+      },
+      {
+        "second": 215.833,
+        "rows": 199,
+        "markMs": 127.944,
+        "acquireMs": 0.001,
+        "sqlMs": 8.375,
+        "commitMs": 119.297,
+        "otherHoldMs": 0.216,
+        "outsideLeaseMs": 0.04,
+        "outbox": 262,
+        "probeOffsetMs": 3,
+        "walInterval": {
+          "from": 214.781,
+          "to": 219.988,
+          "fsyncAvgMs": 4.408,
+          "checkpointIoWriteMs": 0.781
+        }
+      }
+    ],
+    "sqlPeaks": [
+      {
+        "second": 294.041,
+        "rows": 200,
+        "markMs": 64.709,
+        "acquireMs": 0.001,
+        "sqlMs": 54.37,
+        "commitMs": 10.106,
+        "otherHoldMs": 0.192,
+        "outsideLeaseMs": 0.027,
+        "outbox": 391,
+        "probeOffsetMs": -122,
+        "walInterval": {
+          "from": 290.216,
+          "to": 295.795,
+          "fsyncAvgMs": 4.838,
+          "checkpointIoWriteMs": 0
+        }
+      },
+      {
+        "second": 124.786,
+        "rows": 171,
+        "markMs": 47.405,
+        "acquireMs": 0.001,
+        "sqlMs": 39.336,
+        "commitMs": 7.874,
+        "otherHoldMs": 0.153,
+        "outsideLeaseMs": 0.023,
+        "outbox": 246,
+        "probeOffsetMs": -25,
+        "walInterval": {
+          "from": 120.061,
+          "to": 125.345,
+          "fsyncAvgMs": 4.352,
+          "checkpointIoWriteMs": 0
+        }
+      },
+      {
+        "second": 75.492,
+        "rows": 200,
+        "markMs": 42.263,
+        "acquireMs": 0.001,
+        "sqlMs": 35.127,
+        "commitMs": 6.738,
+        "otherHoldMs": 0.335,
+        "outsideLeaseMs": 0.037,
+        "outbox": 278,
+        "probeOffsetMs": -145,
+        "walInterval": {
+          "from": 72.686,
+          "to": 78.011,
+          "fsyncAvgMs": 3.77,
+          "checkpointIoWriteMs": 0
+        }
+      }
+    ],
+    "outboxPeak": {
+      "second": 5.132,
+      "value": 1958
+    },
+    "walFsyncAvgMs": 4.175,
+    "jfr": {
+      "gc": {
+        "events": 140,
+        "aggregateMs": 1296.753,
+        "maxEventMs": 19.96
+      },
+      "articleBackgroundPark": {
+        "events": 0,
+        "aggregateMs": 0,
+        "maxEventMs": null
+      }
+    },
+    "pgFailures": 0
+  }
+]

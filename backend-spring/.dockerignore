@@ -1,0 +1,10 @@
+# 本地凭据不进入镜像构建上下文。
+.env
+.env.*
+!.env.example
+
+# 只从源码构建，避免复制本机产物和版本控制元数据。
+target/
+.git/
+.gitignore
+*.log

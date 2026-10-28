@@ -1,0 +1,102 @@
+# 独立压测栈：使用单独的数据库、Redis、RabbitMQ 和本地文件目录。
+# 从 backend-spring 目录执行：docker compose -p air-perf --env-file target/perf.env -f perf/compose.yml up -d --wait
+services:
+  postgres:
+    image: postgres:18.6
+    environment:
+      POSTGRES_DB: air_perf
+      POSTGRES_USER: air_perf
+      POSTGRES_PASSWORD: ${PERF_DB_PASSWORD:?请先生成 target/perf.env}
+    volumes:
+      - postgres-data:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U air_perf -d air_perf"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  redis:
+    image: redis:8.4-alpine
+    command: ["redis-server", "--save", "", "--appendonly", "no"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  rabbitmq:
+    image: rabbitmq:4.3.6-management-alpine
+    environment:
+      RABBITMQ_DEFAULT_USER: air_perf
+      RABBITMQ_DEFAULT_PASS: ${PERF_RABBIT_PASSWORD:?请先生成 target/perf.env}
+    volumes:
+      - rabbitmq-data:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  app:
+    image: ${PERF_APP_IMAGE:-backend-spring-app:latest}
+    environment:
+      SPRING_PROFILES_ACTIVE: local
+      SERVER_PORT: 8081
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/air_perf
+      SPRING_DATASOURCE_USERNAME: air_perf
+      SPRING_DATASOURCE_PASSWORD: ${PERF_DB_PASSWORD:?请先生成 target/perf.env}
+      SPRING_DATASOURCE_HIKARI_MAXIMUM_POOL_SIZE: ${PERF_DB_POOL_SIZE:-10}
+      SPRING_DATASOURCE_HIKARI_MINIMUM_IDLE: ${PERF_DB_POOL_SIZE:-10}
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_USERNAME: air_perf
+      RABBITMQ_PASSWORD: ${PERF_RABBIT_PASSWORD:?请先生成 target/perf.env}
+      AUTH_REGISTRATION_ENABLED: "false"
+      AUTH_ADMIN_USERNAME: perf_admin
+      AUTH_ADMIN_PASSWORD: ${PERF_ADMIN_PASSWORD:?请先生成 target/perf.env}
+      AUTH_USER_USERNAME: perf_user
+      AUTH_USER_PASSWORD: ${PERF_USER_PASSWORD:?请先生成 target/perf.env}
+      MUSIC_SOURCE: local
+      ARTICLE_CONTENT_DIR: /app/public/articles
+      CHATTER_CONTENT_DIR: /app/public/chatter
+      MUSIC_CONTENT_DIR: /app/music
+      MUSIC_IMPORT_STAGING_DIR: /app/import-staging
+      # 压测默认保留产品限流与队列容量；单独测吞吐时再通过 test.env 覆盖。
+      RATE_LIMIT_ENABLED: ${PERF_RATE_LIMIT_ENABLED:-true}
+      ARTICLE_METRIC_CONSUMER_BATCH_SIZE: ${PERF_CONSUMER_BATCH_SIZE:-100}
+      ARTICLE_METRIC_PUBLISHER_MAX_BATCHES: ${PERF_PUBLISHER_MAX_BATCHES:-1}
+      ARTICLE_METRIC_MARK_SERVER_PREPARE_DISABLED: ${PERF_MARK_SERVER_PREPARE_DISABLED:-false}
+      ARTICLE_METRIC_PUBLISHER_RUN_BUDGET_MS: ${PERF_PUBLISHER_RUN_BUDGET_MS:-250}
+      ARTICLE_METRIC_CONSUMER_BATCH_WAIT_MS: ${PERF_CONSUMER_BATCH_WAIT_MS:-100}
+      AIRCHORD_PERF_TIMING_ENABLED: ${PERF_TIMING_ENABLED:-false}
+      AIRCHORD_PERF_JDBC_ENABLED: ${PERF_JDBC_TIMING_ENABLED:-false}
+      AIRCHORD_PERF_JDBC_SAMPLE_RATE: ${PERF_JDBC_SAMPLE_RATE:-1.0}
+      AIRCHORD_PERF_PG_ENABLED: ${PERF_PG_ENABLED:-false}
+      AIRCHORD_PERF_BACKGROUND_POOL_SIZE: ${PERF_BACKGROUND_POOL_SIZE:-0}
+      RATE_LIMIT_LOGIN_IP_MAX: ${PERF_LOGIN_IP_MAX:-5}
+      RATE_LIMIT_LOGIN_USERNAME_MAX: ${PERF_LOGIN_USERNAME_MAX:-10}
+      RATE_LIMIT_COMMENT_IP_MAX: ${PERF_COMMENT_IP_MAX:-20}
+      RATE_LIMIT_COMMENT_USER_MAX: ${PERF_COMMENT_USER_MAX:-10}
+      RATE_LIMIT_ADMIN_MAX: ${PERF_ADMIN_MAX:-60}
+      RATE_LIMIT_CSRF_IP_MAX: ${PERF_CSRF_IP_MAX:-30}
+    ports:
+      - "127.0.0.1:${PERF_HOST_PORT:-18081}:8081"
+    volumes:
+      - ../target/perf-data/articles:/app/public/articles:rw
+      - ../target/perf-data/chatter:/app/public/chatter:rw
+      - ../target/perf-data/music:/app/music:rw
+      - music-import-staging:/app/import-staging:rw
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+
+volumes:
+  postgres-data:
+  rabbitmq-data:
+  music-import-staging:
+

@@ -1,0 +1,7 @@
+{
+  "code": "ARTICLE_NOT_FOUND",
+  "message": "Article not found: draft-reference",
+  "timestamp": "2026-09-01T00:00:00Z",
+  "path": "/api/v1/articles/draft-reference",
+  "details": {}
+}

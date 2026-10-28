@@ -1,0 +1,14 @@
+{
+  "id": "article-demo",
+  "slug": "learning-spring",
+  "title": "用 Spring 学习后端",
+  "summary": "一篇用于固定接口字段的虚构文章。",
+  "coverUrl": "/articles/learning-spring/cover.svg",
+  "coverColor": "#315B8A",
+  "tags": ["学习", "Spring"],
+  "status": "PUBLISHED",
+  "publishedAt": "2026-09-01T10:00:00Z",
+  "createdAt": "2026-09-01T09:00:00Z",
+  "updatedAt": "2026-09-01T10:00:00Z",
+  "contentMarkdown": "# 用 Spring 学习后端\n\n这是一份虚构的 Markdown 参照正文。"
+}

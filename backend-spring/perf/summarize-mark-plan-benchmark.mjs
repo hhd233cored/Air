@@ -1,0 +1,16 @@
+import {readFileSync,writeFileSync} from 'node:fs';import assert from 'node:assert/strict';
+import {sanitizeNode} from './parse-auto-explain.mjs';
+const [input,output]=process.argv.slice(2);if(!output)throw Error('Usage: summarize-mark-plan-benchmark.mjs input.jsonl output-prefix');
+const raw=readFileSync(input,'utf8').trim().split(/\r?\n/).filter(l=>l.startsWith('{')).map(JSON.parse);
+const flatten=n=>[n,...(n.Plans??[]).flatMap(flatten)],round=n=>Number(n.toFixed(3));
+const states=raw.filter(r=>r.stage&&!r.plan),size=raw.find(r=>r.indexBytes);
+assert.equal(states.length,6);assert.ok(states.every(r=>r.pending===20000&&r.published===states[0].published));assert.ok(size.indexBytes>0&&size.pending===20000);
+const batches=raw.filter(r=>r.plan).map(r=>{const p=r.plan[0],nodes=flatten(p.Plan);assert.equal(nodes.find(n=>n['Relation Name']==='outbox'&&n['Actual Rows']===200)?.['Actual Loops'],1);return {stage:r.stage,iteration:r.iteration,executionMs:p['Execution Time'],planningMs:p['Planning Time'],shape:nodes.map(n=>n['Node Type']+(n['Index Name']?'('+n['Index Name']+')':'')).join(' > '),plan:sanitizeNode(p.Plan)};});
+assert.equal(batches.length,60);
+const stats=a=>{a=a.slice().sort((a,b)=>a-b);return {samples:a.length,avg:round(a.reduce((s,n)=>s+n,0)/a.length),p50:a[Math.ceil(a.length*.5)-1],p95:a[Math.ceil(a.length*.95)-1],max:a.at(-1)};};
+const stages=states.map(s=>{const b=batches.filter(b=>b.stage===s.stage);assert.equal(b.length,10);return {...s,executionMs:stats(b.map(b=>b.executionMs)),planningMs:stats(b.map(b=>b.planningMs)),shapes:[...new Set(b.map(b=>b.shape))],example:b[0].plan};});
+const r={checks:'PASS',logicalHistoricalRows:states[0].published,pending:20000,rowsPerMark:200,warmupPerStage:5,measuredPerStage:10,indexBytes:size.indexBytes,stages,batches};
+writeFileSync(output+'.json',JSON.stringify(r,null,2)+'\n');
+const rows=batches.map(b=>({...b,plan:JSON.stringify(b.plan)})),keys=Object.keys(rows[0]),cell=v=>'"'+String(v).replaceAll('"','""')+'"';
+writeFileSync(output+'.csv',[keys.join(','),...rows.map(r=>keys.map(k=>cell(r[k])).join(','))].join('\n')+'\n');
+console.log(JSON.stringify({...r,batches:undefined}));

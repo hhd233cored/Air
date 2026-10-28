@@ -1,0 +1,9 @@
+# Mount a separately created, verified physical clone; preserve historical volumes.
+services:
+  postgres:
+    volumes:
+      - snapshot-postgres:/var/lib/postgresql
+volumes:
+  snapshot-postgres:
+    external: true
+    name: ${PERF_SNAPSHOT_PG_VOLUME:?Set the isolated clone volume}

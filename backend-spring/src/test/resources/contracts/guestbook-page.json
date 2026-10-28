@@ -1,0 +1,19 @@
+{
+  "content": [
+    {
+      "id": 3001,
+      "targetType": "GUESTBOOK",
+      "targetId": "main",
+      "parentId": null,
+      "content": "这是一条虚构的留言板样例。",
+      "status": "VISIBLE",
+      "author": { "id": 1002, "username": "demo-reader", "avatarUrl": null },
+      "createdAt": "2026-09-07T09:00:00Z",
+      "updatedAt": "2026-09-07T09:00:00Z"
+    }
+  ],
+  "page": 0,
+  "size": 20,
+  "totalElements": 1,
+  "totalPages": 1
+}

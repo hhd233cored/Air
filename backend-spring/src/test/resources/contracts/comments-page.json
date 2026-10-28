@@ -1,0 +1,38 @@
+{
+  "content": [
+    {
+      "id": 2001,
+      "targetType": "ARTICLE",
+      "targetId": "learning-spring",
+      "parentId": null,
+      "content": "这篇示例文章很清楚。",
+      "status": "VISIBLE",
+      "author": {
+        "id": 1002,
+        "username": "demo-reader",
+        "avatarUrl": null
+      },
+      "createdAt": "2026-09-05T09:00:00Z",
+      "updatedAt": "2026-09-05T09:00:00Z"
+    },
+    {
+      "id": 2002,
+      "targetType": "ARTICLE",
+      "targetId": "learning-spring",
+      "parentId": 2001,
+      "content": "谢谢，这是虚构的一级回复。",
+      "status": "VISIBLE",
+      "author": {
+        "id": 1001,
+        "username": "demo-admin",
+        "avatarUrl": null
+      },
+      "createdAt": "2026-09-05T09:10:00Z",
+      "updatedAt": "2026-09-05T09:10:00Z"
+    }
+  ],
+  "page": 0,
+  "size": 20,
+  "totalElements": 2,
+  "totalPages": 1
+}

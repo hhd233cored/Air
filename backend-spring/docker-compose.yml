@@ -1,0 +1,150 @@
+services:
+  postgres:
+    image: postgres:18.6
+    environment:
+      POSTGRES_DB: air_spring_dev
+      POSTGRES_USER: ${SPRING_DATASOURCE_USERNAME:-airchord_local}
+      POSTGRES_PASSWORD: ${SPRING_DATASOURCE_PASSWORD:?请先将 .env.example 复制为 .env 并填写本机密码}
+    ports:
+      - "127.0.0.1:${POSTGRES_HOST_PORT:-5433}:5432"
+    # PostgreSQL 18 的官方镜像将数据目录放在 /var/lib/postgresql/18/docker。
+    # 挂载父目录可让具名卷持久保存数据，也为以后学习 pg_upgrade 留出空间。
+    volumes:
+      - postgres-data:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U \"$$POSTGRES_USER\" -d \"$$POSTGRES_DB\""]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
+
+  app:
+    # 一条 Compose 命令会构建并启动 Java，同时等待 PostgreSQL 和 Redis 就绪。
+    build:
+      context: .
+      dockerfile: Dockerfile
+    environment:
+      SPRING_PROFILES_ACTIVE: local
+      SERVER_PORT: 8081
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/air_spring_dev
+      SPRING_DATASOURCE_USERNAME: ${SPRING_DATASOURCE_USERNAME:-airchord_local}
+      SPRING_DATASOURCE_PASSWORD: ${SPRING_DATASOURCE_PASSWORD:?请先将 .env.example 复制为 .env 并填写本机密码}
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-}
+      REDIS_SSL_ENABLED: ${REDIS_SSL_ENABLED:-false}
+      REDIS_TIMEOUT: ${REDIS_TIMEOUT:-1s}
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: 5672
+      RABBITMQ_USERNAME: ${RABBITMQ_USERNAME:-airchord_local}
+      RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:?请在 .env 设置本机 RabbitMQ 密码}
+      AUTH_REGISTRATION_ENABLED: ${AUTH_REGISTRATION_ENABLED:-true}
+      AUTH_SESSION_TIMEOUT: ${AUTH_SESSION_TIMEOUT:-7d}
+      AUTH_COOKIE_NAME: ${AUTH_COOKIE_NAME:-air_session}
+      AUTH_COOKIE_SECURE: ${AUTH_COOKIE_SECURE:-false}
+      AUTH_COOKIE_SAMESITE: ${AUTH_COOKIE_SAMESITE:-Lax}
+      AUTH_ADMIN_USERNAME: ${AUTH_ADMIN_USERNAME:-}
+      AUTH_ADMIN_PASSWORD: ${AUTH_ADMIN_PASSWORD:-}
+      AUTH_USER_USERNAME: ${AUTH_USER_USERNAME:-}
+      AUTH_USER_PASSWORD: ${AUTH_USER_PASSWORD:-}
+      AUTH_AVATAR_MAX_BYTES: ${AUTH_AVATAR_MAX_BYTES:-2097152}
+      COMMENTS_ENABLED: ${COMMENTS_ENABLED:-true}
+      COMMENTS_MAX_LENGTH: ${COMMENTS_MAX_LENGTH:-1000}
+      EDITOR_ENABLED: ${EDITOR_ENABLED:-false}
+      EDITOR_UPLOAD_MAX_BYTES: ${EDITOR_UPLOAD_MAX_BYTES:-104857600}
+      MUSIC_SOURCE: ${MUSIC_SOURCE:-local}
+      MUSIC_MAX_UPLOAD_BYTES: ${MUSIC_MAX_UPLOAD_BYTES:-52428800}
+      SPRING_MULTIPART_MAX_FILE_SIZE: 100MB
+      SPRING_MULTIPART_MAX_REQUEST_SIZE: 100MB
+      RATE_LIMIT_ENABLED: ${RATE_LIMIT_ENABLED:-true}
+      ARTICLE_METRIC_CONSUMER_BATCH_SIZE: ${ARTICLE_METRIC_CONSUMER_BATCH_SIZE:-100}
+      ARTICLE_METRIC_PUBLISHER_MAX_BATCHES: ${ARTICLE_METRIC_PUBLISHER_MAX_BATCHES:-1}
+      ARTICLE_METRIC_PUBLISHER_RUN_BUDGET_MS: ${ARTICLE_METRIC_PUBLISHER_RUN_BUDGET_MS:-250}
+      ARTICLE_METRIC_CONSUMER_BATCH_WAIT_MS: ${ARTICLE_METRIC_CONSUMER_BATCH_WAIT_MS:-100}
+      RATE_LIMIT_MAX_KEYS: ${RATE_LIMIT_MAX_KEYS:-10000}
+      RATE_LIMIT_TRUST_PROXY_HEADERS: ${RATE_LIMIT_TRUST_PROXY_HEADERS:-false}
+      TRUSTED_PROXY_IPS: ${TRUSTED_PROXY_IPS:-127.0.0.1}
+      RATE_LIMIT_LOGIN_IP_MAX: ${RATE_LIMIT_LOGIN_IP_MAX:-5}
+      RATE_LIMIT_LOGIN_IP_WINDOW_SECONDS: ${RATE_LIMIT_LOGIN_IP_WINDOW_SECONDS:-60}
+      RATE_LIMIT_LOGIN_USERNAME_MAX: ${RATE_LIMIT_LOGIN_USERNAME_MAX:-10}
+      RATE_LIMIT_LOGIN_USERNAME_WINDOW_SECONDS: ${RATE_LIMIT_LOGIN_USERNAME_WINDOW_SECONDS:-600}
+      RATE_LIMIT_REGISTER_IP_MAX: ${RATE_LIMIT_REGISTER_IP_MAX:-3}
+      RATE_LIMIT_REGISTER_IP_WINDOW_SECONDS: ${RATE_LIMIT_REGISTER_IP_WINDOW_SECONDS:-3600}
+      RATE_LIMIT_COMMENT_IP_MAX: ${RATE_LIMIT_COMMENT_IP_MAX:-20}
+      RATE_LIMIT_COMMENT_IP_WINDOW_SECONDS: ${RATE_LIMIT_COMMENT_IP_WINDOW_SECONDS:-60}
+      RATE_LIMIT_COMMENT_USER_MAX: ${RATE_LIMIT_COMMENT_USER_MAX:-10}
+      RATE_LIMIT_COMMENT_USER_WINDOW_SECONDS: ${RATE_LIMIT_COMMENT_USER_WINDOW_SECONDS:-60}
+      RATE_LIMIT_GUESTBOOK_IP_MAX: ${RATE_LIMIT_GUESTBOOK_IP_MAX:-10}
+      RATE_LIMIT_GUESTBOOK_IP_WINDOW_SECONDS: ${RATE_LIMIT_GUESTBOOK_IP_WINDOW_SECONDS:-3600}
+      RATE_LIMIT_GUESTBOOK_USER_MAX: ${RATE_LIMIT_GUESTBOOK_USER_MAX:-3}
+      RATE_LIMIT_GUESTBOOK_USER_WINDOW_SECONDS: ${RATE_LIMIT_GUESTBOOK_USER_WINDOW_SECONDS:-3600}
+      RATE_LIMIT_AVATAR_USER_MAX: ${RATE_LIMIT_AVATAR_USER_MAX:-5}
+      RATE_LIMIT_AVATAR_USER_WINDOW_SECONDS: ${RATE_LIMIT_AVATAR_USER_WINDOW_SECONDS:-3600}
+      RATE_LIMIT_ADMIN_MAX: ${RATE_LIMIT_ADMIN_MAX:-60}
+      RATE_LIMIT_ADMIN_WINDOW_SECONDS: ${RATE_LIMIT_ADMIN_WINDOW_SECONDS:-60}
+      RATE_LIMIT_CSRF_IP_MAX: ${RATE_LIMIT_CSRF_IP_MAX:-30}
+      RATE_LIMIT_CSRF_IP_WINDOW_SECONDS: ${RATE_LIMIT_CSRF_IP_WINDOW_SECONDS:-60}
+      RATE_LIMIT_ARTICLE_VIEW_IP_MAX: ${RATE_LIMIT_ARTICLE_VIEW_IP_MAX:-120}
+      RATE_LIMIT_ARTICLE_LIKE_IP_MAX: ${RATE_LIMIT_ARTICLE_LIKE_IP_MAX:-300}
+      RATE_LIMIT_ARTICLE_LIKE_USER_MAX: ${RATE_LIMIT_ARTICLE_LIKE_USER_MAX:-30}
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost:3000,http://127.0.0.1:3000}
+      ARTICLE_CONTENT_DIR: /app/public/articles
+      CHATTER_CONTENT_DIR: /app/public/chatter
+      MUSIC_CONTENT_DIR: /app/music
+      MUSIC_IMPORT_STAGING_DIR: /app/import-staging
+      MUSIC_IMPORT_MAX_JOBS: ${MUSIC_IMPORT_MAX_JOBS:-20}
+      MUSIC_IMPORT_MAX_STAGING_BYTES: ${MUSIC_IMPORT_MAX_STAGING_BYTES:-1073741824}
+    ports:
+      - "127.0.0.1:${SPRING_HOST_PORT:-8081}:8081"
+    volumes:
+      # 编辑器会原子更新 Markdown/JSON 备份与上传图片，所以内容卷需要读写。
+      - ../public/articles:/app/public/articles:rw
+      - ../public/chatter:/app/public/chatter:rw
+      # 本地音乐管理把上传音频与 playlist.json 写入仓库 music 目录。
+      - ../music:/app/music:rw
+      # 未完成的音频保存在私有具名卷，不会被 /music/** 静态资源处理器公开。
+      - music-import-staging:/app/import-staging:rw
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    restart: unless-stopped
+
+  redis:
+    image: redis:8.4-alpine
+    # 这是可丢弃的本地缓存，不启用磁盘持久化；端口仅发布到本机回环地址。
+    command: ["redis-server", "--save", "", "--appendonly", "no"]
+    ports:
+      - "127.0.0.1:${REDIS_HOST_PORT:-6379}:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
+
+  rabbitmq:
+    image: rabbitmq:4.3.6-management-alpine
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USERNAME:-airchord_local}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:?请在 .env 设置本机 RabbitMQ 密码}
+    # 开发时允许宿主机 Java 连接；管理界面和 AMQP 都只绑定本机回环地址。
+    ports:
+      - "127.0.0.1:${RABBITMQ_HOST_PORT:-5672}:5672"
+      - "127.0.0.1:${RABBITMQ_MANAGEMENT_HOST_PORT:-15672}:15672"
+    volumes:
+      - rabbitmq-data:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    restart: unless-stopped
+
+volumes:
+  postgres-data:
+  rabbitmq-data:
+  music-import-staging:

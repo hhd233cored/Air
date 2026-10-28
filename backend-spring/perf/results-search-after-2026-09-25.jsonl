@@ -1,0 +1,8 @@
+{"event":"stage-start","scenario":"search-high","requestedRps":200,"durationSeconds":30}
+{"scenario":"search-high","requestedRps":200,"elapsedSeconds":30,"achievedRps":199.8,"requests":5999,"droppedByGenerator":0,"statuses":{"200":5999},"p50Ms":18.5,"p95Ms":35.3,"p99Ms":44.1,"maxMs":89}
+{"event":"stage-start","scenario":"search-high","requestedRps":240,"durationSeconds":30}
+{"scenario":"search-high","requestedRps":240,"elapsedSeconds":30,"achievedRps":239.7,"requests":7196,"droppedByGenerator":0,"statuses":{"200":7196},"p50Ms":17.9,"p95Ms":31.1,"p99Ms":35.7,"maxMs":52.5}
+{"event":"stage-start","scenario":"search-high","requestedRps":320,"durationSeconds":30}
+{"scenario":"search-high","requestedRps":320,"elapsedSeconds":30,"achievedRps":319.7,"requests":9591,"droppedByGenerator":0,"statuses":{"200":9591},"p50Ms":17.8,"p95Ms":32.6,"p99Ms":38.2,"maxMs":51}
+{"event":"stage-start","scenario":"search-high","requestedRps":400,"durationSeconds":30}
+{"scenario":"search-high","requestedRps":400,"elapsedSeconds":30,"achievedRps":399.6,"requests":11998,"droppedByGenerator":0,"statuses":{"200":11998},"p50Ms":17.7,"p95Ms":34,"p99Ms":39.5,"maxMs":61}

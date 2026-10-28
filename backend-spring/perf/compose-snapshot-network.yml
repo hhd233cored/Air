@@ -1,0 +1,6 @@
+# Reuse a stopped experiment's network when Docker's address pool is exhausted.
+# Run these experiment stacks sequentially; database volumes remain independent.
+networks:
+  default:
+    external: true
+    name: ${PERF_SNAPSHOT_NETWORK:?Set the shared experiment network}
