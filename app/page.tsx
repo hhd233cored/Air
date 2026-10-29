@@ -424,6 +424,35 @@ function GlassHeader({ eyebrow, title, copy }: { eyebrow: string; title: string;
 function CalendarCard({ now }: { now: Date | null }) {
   const today = now ?? new Date(2026, 6, 13);
   const [viewDate, setViewDate] = useState<Date | null>(null);
+  const cardRef = useRef<HTMLElement | null>(null);
+  const monthRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    const card = cardRef.current;
+    const monthEl = monthRef.current;
+    if (!card || !monthEl) return;
+    const postsCard = card.parentElement?.querySelector<HTMLElement>(".posts-card");
+    if (!postsCard) return;
+
+    const syncCalendarSplit = () => {
+      if (window.innerWidth <= 700) {
+        card.style.removeProperty("--calendar-grid-height");
+        return;
+      }
+      const gridHeight = Math.max(273, postsCard.offsetHeight - monthEl.offsetHeight - 2);
+      card.style.setProperty("--calendar-grid-height", `${gridHeight}px`);
+    };
+
+    syncCalendarSplit();
+    const observer = typeof ResizeObserver !== "undefined" ? new ResizeObserver(syncCalendarSplit) : null;
+    observer?.observe(postsCard);
+    observer?.observe(monthEl);
+    window.addEventListener("resize", syncCalendarSplit);
+    return () => {
+      observer?.disconnect();
+      window.removeEventListener("resize", syncCalendarSplit);
+    };
+  }, []);
   const [selectedDay, setSelectedDay] = useState<number | null>(null);
   const reference = viewDate ?? today;
   const year = reference.getFullYear();
@@ -443,8 +472,8 @@ function CalendarCard({ now }: { now: Date | null }) {
     setViewDate(new Date(year, monthIndex + offset, 1));
   };
   return (
-    <article className="glass-card calendar-card dashboard-card">
-      <div className="calendar-card__month">
+    <article ref={cardRef} className="glass-card calendar-card dashboard-card">
+      <div ref={monthRef} className="calendar-card__month">
         <button className="calendar-nav-button" type="button" onClick={() => changeMonth(-1)} aria-label="查看上个月" title="上个月">‹</button>
         <span>{month}</span>
         <button className="calendar-nav-button" type="button" onClick={() => changeMonth(1)} aria-label="查看下个月" title="下个月">›</button>
@@ -809,10 +838,10 @@ function HomePage({ onPageChange, onOpenArticle, onOpenChatter, onOpenGuestbook,
             <div>
               <h2>S t r I n</h2>
               <p className="profile-bio">
-                大三、半传统派、喜欢摆烂、社恐到线上。爱好是打机、写歌、看书 <br />
-                主力：C++、C#<br />
-                比较擅长：Qt、LangGraph、Godot、FastAPI、Winform<br />
-                会一点：PostgreSQL、Redis、Docker Compose、Unity、Spring Boot、Next.js
+                大三、半传统派、喜欢摆烂、社恐到线上。爱好是打机、写歌、看书。样样都喜欢学点，样样都不精 <br />
+                主力：C#、Java、C++<br />
+                会一些：Spring boot及其中间件（Redis、RabbitMQ、PostgreSQL）、Godot、Unity、WPF、Qt<br />
+                正在学：Kafka、LangChain、Unity Shader
               </p>
             </div>
           </div>

@@ -1122,6 +1122,35 @@ audio { display: none; }
   color: var(--mint);
 }
 
+@media (min-width: 701px) {
+  .feed-column {
+    align-self: stretch;
+  }
+
+  .posts-card {
+    flex: 0 0 auto;
+  }
+
+  .dashboard-split {
+    flex: 1 1 auto;
+  }
+
+  .calendar-card > .calendar-grid {
+    flex: 0 0 auto;
+    height: var(--calendar-grid-height, 286px);
+    align-content: space-between;
+    padding: 15px 17px 14px;
+  }
+
+  .calendar-card > .calendar-history {
+    position: relative;
+    right: auto;
+    bottom: auto;
+    left: auto;
+    flex: 1 1 auto;
+  }
+}
+
 /* 8. Music Player Equalizer Bars & Harmonic Play Pulse */
 .music-bar__track-label,
 .music-player-block--compact .music-bar__track-info > .music-bar__track-label {
