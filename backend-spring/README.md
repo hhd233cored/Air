@@ -1,6 +1,6 @@
 # AirChord Spring Boot 后端：阶段 0–5 与 RabbitMQ 音频导入试点
 
-`backend-spring/` 是新的 Java 后端学习项目。Python/FastAPI 与现有 SQLite 保持原样并继续作为行为参照；Spring Boot 连接独立 PostgreSQL，并使用 Redis 保存登录 session 与公开详情缓存。当前实现覆盖公开读取、搜索、登录鉴权、互动、管理员账号、限流、内容编辑器和本地音乐管理。**SQLite 数据复制暂缓**，Java 不会读取、修改或覆盖 Python SQLite 文件。
+`backend-spring/` 是新的 Java 后端学习项目。Python/FastAPI 与现有 SQLite 保持原样并继续作为行为参照；Spring Boot 连接独立 PostgreSQL，并使用 Redis 保存登录 session 与公开详情缓存。当前实现覆盖公开读取、搜索、登录鉴权、互动、管理员账号、限流、内容编辑器和本地音乐管理。Java 服务不会自动读取或修改 Python SQLite 文件；需要本地对照数据时，可使用下方的一次性复制脚本。
 
 ## 本机要求
 
@@ -33,6 +33,21 @@ Java 服务监听 `http://localhost:8081`；Python/FastAPI 如需并行运行，
 docker compose --env-file .env logs -f app
 Invoke-RestMethod http://localhost:8081/api/v1/health
 ```
+
+### 一次性复制 Python SQLite 数据用于本机检验
+
+源库是 `backend-python/data/auth.sqlite3`。导入前停止 Java 应用并启动 PostgreSQL；脚本先只读预检，再通过 `--apply` 备份两端数据库、在一个事务中追加记录，并核对数量与正文/头像校验值：
+
+```powershell
+Set-Location backend-spring
+docker compose --env-file .env stop app
+docker compose --env-file .env up -d --wait postgres
+& ..\backend-python\.venv\Scripts\python.exe .\scripts\migrate_python_sqlite.py
+& ..\backend-python\.venv\Scripts\python.exe .\scripts\migrate_python_sqlite.py --apply
+docker compose --env-file .env up -d --wait app redis rabbitmq
+```
+
+脚本复制账号（保留 Argon2id 哈希和头像）、文章/说说、评论、留言和注册设置；原有 PostgreSQL 演示行保留。碰到已有账号、内容或评论 ID 时会中止，不会覆盖业务数据，因此不能对同一批记录重复导入。备份及不含业务正文的校验报告位于被 Git 忽略的 `backend-spring/target/python-sqlite-migration-*/`；备份含账号哈希和头像，应仅保存在本机。Python session 不可用于 Java 的 Redis session，用户需重新登录。媒体文件仍由两端共用 `public/` 和 `music/`；SQLite FTS 索引不复制，PostgreSQL 自行维护搜索索引。源库没有文章指标表。完整步骤和恢复说明见 [迁移指南](../docs/PYTHON-SQLITE-TO-JAVA-POSTGRES.md)，此次本机执行结果见 [SQLite 导入记录](perf/RESULTS-PYTHON-SQLITE-MIGRATION-2026-10-28.md)。
 
 停止容器但保留 PostgreSQL 数据卷：
 

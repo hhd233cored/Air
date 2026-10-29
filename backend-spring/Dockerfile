@@ -4,7 +4,9 @@ WORKDIR /workspace
 
 # .dockerignore 会排除本机凭据、Git 元数据和已编译产物。
 COPY . .
-RUN chmod +x ./mvnw \
+# Windows checkouts may give mvnw CRLF endings, which break its /bin/sh shebang.
+RUN sed -i 's/\r$//' ./mvnw \
+    && chmod +x ./mvnw \
     && ./mvnw --batch-mode --no-transfer-progress -Dmaven.test.skip=true package
 
 # 运行阶段只保留 JRE 与可执行 jar，并使用非 root 用户。

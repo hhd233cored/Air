@@ -401,7 +401,7 @@ function ClockDisplay({ now }: { now: Date | null }) {
 
   return (
     <section className="clock-display" aria-label="当前时间">
-      <div className="clock-display__time">{time}</div>
+      <div className="clock-display__time">{time.split(" ").map((char, index) => <span key={`${char}-${index}`} className={char === ":" ? "clock-display__colon" : "clock-display__digit"}>{char}</span>)}</div>
       <div className="clock-display__date">
         <span>{gregorianDate}</span><i>/</i><span>{weekday}</span><i>/</i><span>{lunarDate}</span>
       </div>
@@ -424,6 +424,7 @@ function GlassHeader({ eyebrow, title, copy }: { eyebrow: string; title: string;
 function CalendarCard({ now }: { now: Date | null }) {
   const today = now ?? new Date(2026, 6, 13);
   const [viewDate, setViewDate] = useState<Date | null>(null);
+  const [selectedDay, setSelectedDay] = useState<number | null>(null);
   const reference = viewDate ?? today;
   const year = reference.getFullYear();
   const monthIndex = reference.getMonth();
@@ -438,6 +439,7 @@ function CalendarCard({ now }: { now: Date | null }) {
   const weekdays = ["日", "一", "二", "三", "四", "五", "六"];
   const isViewingToday = year === today.getFullYear() && monthIndex === today.getMonth();
   const changeMonth = (offset: number) => {
+    setSelectedDay(null);
     setViewDate(new Date(year, monthIndex + offset, 1));
   };
   return (
@@ -452,7 +454,7 @@ function CalendarCard({ now }: { now: Date | null }) {
         {calendarDays.map((day, index) => {
           const detail = day ? getCalendarDetail(new Date(year, monthIndex, day)) : undefined;
           return (
-            <span className={`calendar-day ${isViewingToday && day === today.getDate() ? "is-today" : ""} ${detail?.event ? "has-event" : ""}`} key={`${day ?? "empty"}-${index}`} title={detail?.event}>
+            <span className={`calendar-day ${day ? "is-interactive" : ""} ${isViewingToday && day === today.getDate() ? "is-today" : ""} ${day !== null && selectedDay === day ? "is-selected" : ""} ${detail?.event ? "has-event" : ""}`} key={`${day ?? "empty"}-${index}`} title={detail?.event ?? detail?.lunar} onClick={day ? () => setSelectedDay((current) => (current === day ? null : day)) : undefined}>
               {day ? <><b>{day}</b><small>{detail?.event ?? detail?.lunarDay ?? ""}</small></> : null}
             </span>
           );
@@ -487,6 +489,8 @@ function MusicPlayerBar({ compact = false }: { compact?: boolean }) {
   const [volume, setVolume] = useState(0.72);
   const [showVolume, setShowVolume] = useState(false);
   const [showPlaylist, setShowPlaylist] = useState(false);
+  const volumeHoverTimerRef = useRef<number | null>(null);
+  const playlistHoverTimerRef = useRef<number | null>(null);
   const trackUrlRequestsRef = useRef(new Map<string, Promise<string | null>>());
   const track = musicTracks[trackIndex] ?? emptyMusicTrack;
 
@@ -628,21 +632,21 @@ function MusicPlayerBar({ compact = false }: { compact?: boolean }) {
 
   return (
     <div className={`music-player-block ${compact ? "music-player-block--compact" : ""} ${showPlaylist ? "is-playlist-open" : ""}`}>
-      <article className="music-player-bar">
+      <article className={`music-player-bar ${isPlaying ? "is-playing" : ""}`}>
         <div className="music-bar__track-info">
           <div key={track.id ?? trackIndex} className={`music-bar__cover ${isPlaying ? "is-playing" : ""}`} style={track.cover ? { backgroundImage: `url(${track.cover})` } : undefined} />
-          {track.title || track.artist ? <div className={`music-bar__track-label ${track.artist ? "" : "is-single"}`}><strong>{track.title}</strong>{track.artist ? <><span className="music-bar__separator"> - </span><small>{track.artist}</small></> : null}</div> : null}
+          {track.title || track.artist ? <div className={`music-bar__track-label ${track.artist ? "" : "is-single"}`}><strong><span className="music-bar__title-text">{track.title}</span><span className={`music-visualizer ${isPlaying ? "is-playing" : ""}`} aria-hidden="true"><i /><i /><i /><i /></span></strong>{track.artist ? <><span className="music-bar__separator"> - </span><small>{track.artist}</small></> : null}</div> : null}
         </div>
         <div className="music-bar__center">
           <div className="music-bar__transport">
-            <div ref={volumeControlRef} className="music-volume-control">
+            <div ref={volumeControlRef} className="music-volume-control" onMouseEnter={() => { if (volumeHoverTimerRef.current) window.clearTimeout(volumeHoverTimerRef.current); if (playlistHoverTimerRef.current) window.clearTimeout(playlistHoverTimerRef.current); setShowVolume(true); setShowPlaylist(false); }} onMouseLeave={() => { volumeHoverTimerRef.current = window.setTimeout(() => setShowVolume(false), 180); }}>
               <button type="button" aria-label="显示音量" aria-expanded={showVolume} onClick={() => { setShowVolume((visible) => !visible); setShowPlaylist(false); }}><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M4 10v4h4l5 4V6l-5 4H4Zm12.5-1.5a5 5 0 0 1 0 7M18.5 6a9 9 0 0 1 0 12" /></svg></button>
               {showVolume ? <div className="music-popover music-volume-popover"><input aria-label="音量" type="range" min="0" max="1" step="0.01" value={volume} style={{ "--volume-progress": `${volume * 100}%` } as React.CSSProperties} onChange={(event) => setVolume(Number(event.target.value))} /></div> : null}
             </div>
             <button type="button" aria-label="上一首" onClick={() => changeTrack(-1)} disabled={!musicTracks.length}>◀</button>
-            <button className="music-bar__play" type="button" aria-label={loadingTrackUrl || !track.src ? "加载播放地址" : isPlaying ? "暂停" : "播放"} onClick={togglePlayback} disabled={!track.id || !track.canPlay || !track.src || loadingTrackUrl}>{loadingTrackUrl || !track.src ? "…" : isPlaying ? "Ⅱ" : "▶"}</button>
+            <button className={`music-bar__play ${isPlaying ? "is-playing" : ""}`} type="button" aria-label={loadingTrackUrl || !track.src ? "加载播放地址" : isPlaying ? "暂停" : "播放"} onClick={togglePlayback} disabled={!track.id || !track.canPlay || !track.src || loadingTrackUrl}>{loadingTrackUrl || !track.src ? "…" : isPlaying ? "Ⅱ" : "▶"}</button>
             <button type="button" aria-label="下一首" onClick={() => changeTrack(1)} disabled={!musicTracks.length}>▶</button>
-            <div ref={playlistControlRef} className="music-playlist-control">
+            <div ref={playlistControlRef} className="music-playlist-control" onMouseEnter={() => { if (playlistHoverTimerRef.current) window.clearTimeout(playlistHoverTimerRef.current); if (volumeHoverTimerRef.current) window.clearTimeout(volumeHoverTimerRef.current); setShowPlaylist(true); setShowVolume(false); }} onMouseLeave={() => { playlistHoverTimerRef.current = window.setTimeout(() => setShowPlaylist(false), 180); }}>
               <button type="button" aria-label="显示歌单" aria-expanded={showPlaylist} onClick={() => { setShowPlaylist((visible) => !visible); setShowVolume(false); }}><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M5 7h14M5 12h14M5 17h14" /></svg></button>
               {showPlaylist ? (
                 <div ref={playlistPopoverRef} className="music-popover music-playlist-popover">
@@ -722,9 +726,9 @@ function HomeArticleCard({ article, onOpenArticle }: { article: ArticleSummary; 
       type="button"
       onClick={() => onOpenArticle(article.slug)}
       onMouseEnter={handleHover}
-      onMouseLeave={() => { setIsHovered(false); previewAbortRef.current?.abort(); }}
+      onMouseLeave={() => { setIsHovered(false); setPreviewLoading(false); previewAbortRef.current?.abort(); }}
       onFocus={handleHover}
-      onBlur={() => { setIsHovered(false); previewAbortRef.current?.abort(); }}
+      onBlur={() => { setIsHovered(false); setPreviewLoading(false); previewAbortRef.current?.abort(); }}
       style={{ "--article-mask-rgb": maskRgb } as React.CSSProperties}
     >
       {article.coverUrl ? (
@@ -732,7 +736,7 @@ function HomeArticleCard({ article, onOpenArticle }: { article: ArticleSummary; 
           <img className="article-list-card__cover" src={coverSrc} alt="" loading="eager" decoding="async" />
           <div className="article-list-card__mask">
             <h2 className="article-list-card__mask-title">{article.title}</h2>
-            <div className="article-list-card__preview" aria-live="polite"><div className="article-list-card__preview-copy">{isHovered ? (previewLoading ? <span>正在读取正文…</span> : previewLines.map((line, lineIndex) => <span key={`${article.slug}-home-preview-${lineIndex}`}>{line}</span>)) : null}</div></div>
+            <div className="article-list-card__preview" aria-live="polite"><div className="article-list-card__preview-copy">{previewLoading && !previewLines.length ? <span>正在读取正文…</span> : previewLines.map((line, lineIndex) => <span key={`${article.slug}-home-preview-${lineIndex}`}>{line}</span>)}</div></div>
           </div>
           <div className="article-list-card__bottom-bar" aria-hidden="true" />
         </>
@@ -744,6 +748,7 @@ function HomeArticleCard({ article, onOpenArticle }: { article: ArticleSummary; 
 function HomePage({ onPageChange, onOpenArticle, onOpenChatter, onOpenGuestbook, now }: { onPageChange: (page: PageKey) => void; onOpenArticle: (slug: string) => void; onOpenChatter: () => void; onOpenGuestbook: () => void; now: Date | null }) {
   const [latestArticles, setLatestArticles] = useState<ArticleSummary[]>([]);
   const [chatterEntries, setChatterEntries] = useState<ChatterSummary[]>([]);
+  const [emailCopied, setEmailCopied] = useState(false);
   useEffect(() => {
     let cancelled = false;
     getPublishedArticles(0, 3)
@@ -816,7 +821,7 @@ function HomePage({ onPageChange, onOpenArticle, onOpenChatter, onOpenGuestbook,
               <a className="profile-action" href="https://github.com/hhd233cored" target="_blank" rel="noreferrer" aria-label="GitHub">
                 <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M12 2.5a9.5 9.5 0 0 0-3 18.51c.48.09.66-.21.66-.46v-1.68c-2.7.59-3.27-1.14-3.27-1.14-.44-1.13-1.08-1.43-1.08-1.43-.88-.6.07-.59.07-.59.97.07 1.48.99 1.48.99.87 1.48 2.28 1.05 2.84.8.09-.63.34-1.05.62-1.29-2.16-.25-4.43-1.08-4.43-4.81 0-1.06.38-1.93.99-2.61-.1-.25-.43-1.31.09-2.58 0 0 .81-.26 2.63 1a9.1 9.1 0 0 1 4.8 0c1.82-1.26 2.63-1 2.63-1 .52 1.27.19 2.33.09 2.58.62.68.99 1.55.99 2.61 0 3.74-2.27 4.56-4.44 4.8.35.3.66.88.66 1.78v2.64c0 .25.18.55.67.46A9.5 9.5 0 0 0 12 2.5Z" /></svg>
               </a>
-              <button className="profile-action profile-action--email" type="button" aria-label="复制邮箱" data-tooltip="st2073181270@outlook.com（点击复制）" onClick={() => void navigator.clipboard?.writeText("st2073181270@outlook.com")}>
+              <button className={`profile-action profile-action--email ${emailCopied ? "is-copied" : ""}`} type="button" aria-label="复制邮箱" data-tooltip={emailCopied ? "已复制到剪贴板 ✦" : "st2073181270@outlook.com（点击复制）"} onClick={() => { void navigator.clipboard?.writeText("st2073181270@outlook.com"); setEmailCopied(true); window.setTimeout(() => setEmailCopied(false), 2000); }}>
                 <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M3.5 5.5h17v13h-17zM4 6l8 6 8-6" /></svg>
               </button>
             </div>
@@ -1073,6 +1078,215 @@ function ArticleListPage({ onOpenArticle }: { onOpenArticle: (slug: string) => v
   const [hoveredSlug, setHoveredSlug] = useState<string | null>(null);
   const [previews, setPreviews] = useState<Record<string, string[]>>({});
   const [previewLoadingSlug, setPreviewLoadingSlug] = useState<string | null>(null);
+  const timelineViewportRef = useRef<HTMLDivElement | null>(null);
+  const dragStateRef = useRef({ isPointerDown: false, isDragging: false, startX: 0, scrollLeft: 0 });
+  const wheelTargetRef = useRef<number | null>(null);
+  const wheelRafRef = useRef<number | null>(null);
+  const [isDragging, setIsDragging] = useState(false);
+  const [canScrollLeft, setCanScrollLeft] = useState(false);
+  const [canScrollRight, setCanScrollRight] = useState(false);
+  const [scrollProgress, setScrollProgress] = useState(0);
+  const [activeYear, setActiveYear] = useState<string>("all");
+  const [activeMonth, setActiveMonth] = useState<string>("all");
+  const [openDropdown, setOpenDropdown] = useState<"year" | "month" | null>(null);
+  const toolbarRef = useRef<HTMLDivElement | null>(null);
+  const dropdownHoverTimerRef = useRef<number | null>(null);
+
+  const openFilterDropdown = (type: "year" | "month") => {
+    if (dropdownHoverTimerRef.current !== null) {
+      window.clearTimeout(dropdownHoverTimerRef.current);
+      dropdownHoverTimerRef.current = null;
+    }
+    setOpenDropdown(type);
+  };
+
+  const closeFilterDropdownSoon = () => {
+    if (dropdownHoverTimerRef.current !== null) {
+      window.clearTimeout(dropdownHoverTimerRef.current);
+    }
+    dropdownHoverTimerRef.current = window.setTimeout(() => {
+      setOpenDropdown(null);
+      dropdownHoverTimerRef.current = null;
+    }, 160);
+  };
+
+  const getArticleYearMonth = (item: ArticleSummary) => {
+    const raw = item.createdAt ?? item.publishedAt;
+    if (!raw) return { year: "", month: "" };
+    const parsed = new Date(raw);
+    if (Number.isNaN(parsed.getTime())) {
+      return { year: raw.slice(0, 4), month: raw.slice(5, 7) };
+    }
+    return {
+      year: String(parsed.getFullYear()),
+      month: String(parsed.getMonth() + 1).padStart(2, "0"),
+    };
+  };
+
+  const years = Array.from(new Set(articles.map((item) => getArticleYearMonth(item).year).filter(Boolean)));
+  const months = ["01", "02", "03", "04", "05", "06", "07", "08", "09", "10", "11", "12"];
+
+  useEffect(() => {
+    if (!openDropdown) return;
+    const handlePointerDownOutside = (event: MouseEvent) => {
+      if (toolbarRef.current && !toolbarRef.current.contains(event.target as Node)) {
+        setOpenDropdown(null);
+      }
+    };
+    window.addEventListener("mousedown", handlePointerDownOutside);
+    return () => window.removeEventListener("mousedown", handlePointerDownOutside);
+  }, [openDropdown]);
+
+  const updateScrollMetrics = () => {
+    const viewport = timelineViewportRef.current;
+    if (!viewport) return;
+    const maxScroll = Math.max(0, viewport.scrollWidth - viewport.clientWidth);
+    setCanScrollLeft(viewport.scrollLeft > 6);
+    setCanScrollRight(viewport.scrollLeft < maxScroll - 6);
+    setScrollProgress(maxScroll > 0 ? Math.min(1, Math.max(0, viewport.scrollLeft / maxScroll)) : 1);
+  };
+
+  useEffect(() => {
+    updateScrollMetrics();
+    window.addEventListener("resize", updateScrollMetrics);
+    return () => window.removeEventListener("resize", updateScrollMetrics);
+  }, [articles.length, status, activeYear, activeMonth]);
+
+  useEffect(() => {
+    const viewport = timelineViewportRef.current;
+    if (!viewport) return;
+    const handleWheel = (event: WheelEvent) => {
+      if (event.target instanceof Element) {
+        const dropdown = event.target.closest(".article-filter-dropdown");
+        const menu = dropdown?.querySelector<HTMLElement>(".article-filter-menu");
+        if (menu) {
+          if (!menu.contains(event.target) && event.deltaY !== 0) {
+            event.preventDefault();
+            const menuDelta = event.deltaMode === 1 ? event.deltaY * 32 : event.deltaMode === 2 ? event.deltaY * menu.clientHeight : event.deltaY;
+            menu.scrollTop += menuDelta;
+          }
+          return;
+        }
+      }
+      const rawDelta = Math.abs(event.deltaY) >= Math.abs(event.deltaX) ? event.deltaY : event.deltaX;
+      if (rawDelta === 0) return;
+      const maxScroll = Math.max(0, viewport.scrollWidth - viewport.clientWidth);
+      if (maxScroll <= 0) return;
+      event.preventDefault();
+      event.stopPropagation();
+      const pixelDelta = event.deltaMode === 1 ? rawDelta * 42 : event.deltaMode === 2 ? rawDelta * 360 : rawDelta * 1.25;
+      const base = wheelTargetRef.current ?? viewport.scrollLeft;
+      wheelTargetRef.current = Math.min(maxScroll, Math.max(0, base + pixelDelta));
+      if (wheelRafRef.current !== null) return;
+      const step = () => {
+        const currentViewport = timelineViewportRef.current;
+        const target = wheelTargetRef.current;
+        if (!currentViewport || target === null) {
+          wheelRafRef.current = null;
+          return;
+        }
+        const diff = target - currentViewport.scrollLeft;
+        if (Math.abs(diff) < 0.8) {
+          currentViewport.scrollLeft = target;
+          wheelTargetRef.current = null;
+          wheelRafRef.current = null;
+          updateScrollMetrics();
+          return;
+        }
+        currentViewport.scrollLeft += diff * 0.24;
+        updateScrollMetrics();
+        wheelRafRef.current = window.requestAnimationFrame(step);
+      };
+      wheelRafRef.current = window.requestAnimationFrame(step);
+    };
+    const container = viewport.closest(".article-list-stack") ?? viewport;
+    container.addEventListener("wheel", handleWheel as EventListener, { passive: false });
+    return () => {
+      container.removeEventListener("wheel", handleWheel as EventListener);
+      if (wheelRafRef.current !== null) {
+        window.cancelAnimationFrame(wheelRafRef.current);
+        wheelRafRef.current = null;
+      }
+    };
+  }, [status, articles.length]);
+
+  const selectYear = (year: string) => {
+    setActiveYear(year);
+    setOpenDropdown(null);
+    const viewport = timelineViewportRef.current;
+    if (!viewport) return;
+    wheelTargetRef.current = null;
+    viewport.scrollTo({ left: 0, behavior: "smooth" });
+  };
+
+  const selectMonth = (month: string) => {
+    setActiveMonth(month);
+    setOpenDropdown(null);
+    const viewport = timelineViewportRef.current;
+    if (!viewport) return;
+    wheelTargetRef.current = null;
+    viewport.scrollTo({ left: 0, behavior: "smooth" });
+  };
+
+  const handleProgressTrackPointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
+    const viewport = timelineViewportRef.current;
+    if (!viewport) return;
+    const track = event.currentTarget;
+    const seek = (clientX: number) => {
+      const rect = track.getBoundingClientRect();
+      if (rect.width <= 0) return;
+      const ratio = Math.min(1, Math.max(0, (clientX - rect.left) / rect.width));
+      const maxScroll = Math.max(0, viewport.scrollWidth - viewport.clientWidth);
+      wheelTargetRef.current = null;
+      viewport.scrollLeft = ratio * maxScroll;
+      updateScrollMetrics();
+    };
+    seek(event.clientX);
+    const handleMove = (moveEvent: PointerEvent) => seek(moveEvent.clientX);
+    const handleUp = () => {
+      window.removeEventListener("pointermove", handleMove);
+      window.removeEventListener("pointerup", handleUp);
+    };
+    window.addEventListener("pointermove", handleMove);
+    window.addEventListener("pointerup", handleUp);
+  };
+
+  const handleTimelinePointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
+    if (event.pointerType === "mouse" && event.button !== 0) return;
+    const viewport = timelineViewportRef.current;
+    if (!viewport) return;
+    wheelTargetRef.current = null;
+    dragStateRef.current = {
+      isPointerDown: true,
+      isDragging: false,
+      startX: event.clientX,
+      scrollLeft: viewport.scrollLeft,
+    };
+  };
+
+  const handleTimelinePointerMove = (event: React.PointerEvent<HTMLDivElement>) => {
+    const state = dragStateRef.current;
+    const viewport = timelineViewportRef.current;
+    if (!state.isPointerDown || !viewport) return;
+    const deltaX = event.clientX - state.startX;
+    if (!state.isDragging && Math.abs(deltaX) > 6) {
+      state.isDragging = true;
+      setIsDragging(true);
+    }
+    if (state.isDragging) {
+      viewport.scrollLeft = state.scrollLeft - deltaX;
+      updateScrollMetrics();
+    }
+  };
+
+  const handleTimelinePointerUp = () => {
+    if (!dragStateRef.current.isPointerDown) return;
+    dragStateRef.current.isPointerDown = false;
+    setIsDragging(false);
+    window.setTimeout(() => {
+      dragStateRef.current.isDragging = false;
+    }, 60);
+  };
   const previewAbortRef = useRef<AbortController | null>(null);
 
   useEffect(() => () => previewAbortRef.current?.abort(), []);
@@ -1109,7 +1323,7 @@ function ArticleListPage({ onOpenArticle }: { onOpenArticle: (slug: string) => v
               }
             });
         }
-      }), 300);
+      }), searchQuery.trim() ? 250 : 0);
 
     return () => { cancelled = true; window.clearTimeout(timer); };
   }, [searchQuery]);
@@ -1153,8 +1367,13 @@ function ArticleListPage({ onOpenArticle }: { onOpenArticle: (slug: string) => v
     setPreviewLoadingSlug(null);
   };
 
-  const totalPages = Math.max(1, Math.ceil(articles.length / pageSize));
-  const visibleArticles = articles.slice(currentPage * pageSize, (currentPage + 1) * pageSize);
+  const totalPages = Math.min(0, Math.max(1, Math.ceil(articles.length / pageSize)) + currentPage);
+  const visibleArticles = articles.filter((item) => {
+    const { year, month } = getArticleYearMonth(item);
+    if (activeYear !== "all" && year !== activeYear) return false;
+    if (activeMonth !== "all" && month !== activeMonth) return false;
+    return true;
+  });
   const goToPage = (page: number) => {
     const nextPage = Math.min(Math.max(page, 0), totalPages - 1);
     previewAbortRef.current?.abort();
@@ -1170,6 +1389,73 @@ function ArticleListPage({ onOpenArticle }: { onOpenArticle: (slug: string) => v
           <div className="article-search-bar" role="search">
             <span className="article-search-bar__icon" aria-hidden="true">⌕</span>
             <input type="search" aria-label="搜索文章" placeholder="搜索文章..." value={searchQuery} onChange={(event) => setSearchQuery(event.target.value)} />
+            {searchQuery ? (
+              <button type="button" aria-label="清空搜索" onClick={() => setSearchQuery("")}>
+                <span aria-hidden="true">×</span>
+              </button>
+            ) : null}
+          </div>
+          {articles.length > 0 ? (
+            <div ref={toolbarRef} className="article-timeline-toolbar">
+              <span className="article-total-count" aria-live="polite">
+                <span>共</span>
+                <strong>{visibleArticles.length}</strong>
+                <span>篇文章</span>
+              </span>
+              <span className="article-toolbar-divider" aria-hidden="true" />
+              <div
+                className="article-filter-dropdown"
+                onMouseEnter={() => openFilterDropdown("year")}
+                onMouseLeave={closeFilterDropdownSoon}
+              >
+                <button
+                  type="button"
+                  className={`article-filter-btn ${openDropdown === "year" ? "is-open" : ""}`}
+                  aria-haspopup="listbox"
+                  aria-expanded={openDropdown === "year"}
+                  onClick={() => setOpenDropdown((current) => (current === "year" ? null : "year"))}
+                >
+                  <span>{activeYear === "all" ? "全部年份" : `${activeYear} 年`}</span>
+                  <i className="article-filter-btn__chevron" aria-hidden="true">▾</i>
+                </button>
+                {openDropdown === "year" ? (
+                  <div className="article-filter-menu" role="listbox" aria-label="选择年份">
+                    <button type="button" role="option" aria-selected={activeYear === "all"} className={`article-filter-option ${activeYear === "all" ? "is-active" : ""}`} onClick={() => selectYear("all")}>全部年份</button>
+                    {years.map((year) => (
+                      <button key={year} type="button" role="option" aria-selected={activeYear === year} className={`article-filter-option ${activeYear === year ? "is-active" : ""}`} onClick={() => selectYear(year)}>{year} 年</button>
+                    ))}
+                  </div>
+                ) : null}
+              </div>
+              <div
+                className="article-filter-dropdown"
+                onMouseEnter={() => openFilterDropdown("month")}
+                onMouseLeave={closeFilterDropdownSoon}
+              >
+                <button
+                  type="button"
+                  className={`article-filter-btn ${openDropdown === "month" ? "is-open" : ""}`}
+                  aria-haspopup="listbox"
+                  aria-expanded={openDropdown === "month"}
+                  onClick={() => setOpenDropdown((current) => (current === "month" ? null : "month"))}
+                >
+                  <span>{activeMonth === "all" ? "全部月份" : `${Number(activeMonth)} 月`}</span>
+                  <i className="article-filter-btn__chevron" aria-hidden="true">▾</i>
+                </button>
+                {openDropdown === "month" ? (
+                  <div className="article-filter-menu article-filter-menu--months" role="listbox" aria-label="选择月份">
+                    <button type="button" role="option" aria-selected={activeMonth === "all"} className={`article-filter-option ${activeMonth === "all" ? "is-active" : ""}`} onClick={() => selectMonth("all")}>全部月份</button>
+                    {months.map((month) => (
+                      <button key={month} type="button" role="option" aria-selected={activeMonth === month} className={`article-filter-option ${activeMonth === month ? "is-active" : ""}`} onClick={() => selectMonth(month)}>{Number(month)} 月</button>
+                    ))}
+                  </div>
+                ) : null}
+              </div>
+            </div>
+          ) : null}
+        </div>
+        <div style={{ display: "none" }}>
+          <div>
           </div>
         </div>
 
@@ -1177,19 +1463,30 @@ function ArticleListPage({ onOpenArticle }: { onOpenArticle: (slug: string) => v
         {status === "error" ? <p className="article-state">文章搜索服务暂时不可用。</p> : null}
         {status === "fallback" ? <p className="article-list-note">API 暂不可用，当前显示本地示例文章。</p> : null}
         {status === "ready" || status === "fallback" ? (
-          <div className="article-timeline" aria-label="文章列表">
-            {visibleArticles.map((article) => {
+          <div
+            ref={timelineViewportRef}
+            className={`article-timeline article-timeline--horizontal ${isDragging ? "is-dragging" : ""} ${canScrollLeft ? "can-scroll-left" : ""} ${canScrollRight ? "can-scroll-right" : ""}`}
+            aria-label="文章列表"
+            onScroll={updateScrollMetrics}
+            onPointerDown={handleTimelinePointerDown}
+            onPointerMove={handleTimelinePointerMove}
+            onPointerUp={handleTimelinePointerUp}
+            onPointerCancel={handleTimelinePointerUp}
+            onMouseLeave={handleTimelinePointerUp}
+          >
+            <div className="article-timeline-runway" aria-hidden="true"><div className="article-timeline-node" /></div>
+            {visibleArticles.map((article, index) => {
               const timelineDate = article.createdAt ?? article.publishedAt;
               const createdAt = formatArticleCreatedAt(timelineDate);
               const isHovered = hoveredSlug === article.slug;
               return (
-                <div className="article-timeline-item" key={article.id}>
+                <div className={`article-timeline-item ${index === 0 ? "is-first" : ""} ${isHovered ? "is-hovered" : ""}`} key={article.id} data-year={createdAt.date.slice(0, 4)}>
                   <time className="article-timeline-date" dateTime={timelineDate ?? undefined}><strong>{createdAt.date}</strong><span>{createdAt.time}</span></time>
-                  <span className="article-timeline-dot" aria-hidden="true" />
+                  <div className="article-timeline-node" aria-hidden="true"><span className="article-timeline-dot" /><span className="article-timeline-stem" /></div>
                   <button
                     className={`glass-card article-list-card ${article.coverUrl ? "has-cover" : ""} ${isHovered ? "is-hovered" : ""}`}
                     type="button"
-                    onClick={() => onOpenArticle(article.slug)}
+                    onClick={() => { if (dragStateRef.current.isDragging) return; onOpenArticle(article.slug); }}
                     onMouseEnter={() => handleArticleHover(article.slug)}
                     onMouseLeave={handleArticleLeave}
                     onFocus={() => handleArticleHover(article.slug)}
@@ -1201,7 +1498,7 @@ function ArticleListPage({ onOpenArticle }: { onOpenArticle: (slug: string) => v
                         <img className="article-list-card__cover" src={resolveApiUrl(article.coverUrl)} alt="" loading="lazy" decoding="async" />
                         <div className="article-list-card__mask">
                           <h2 className="article-list-card__mask-title">{article.title}</h2>
-                          <div className="article-list-card__preview" aria-live="polite"><div className="article-list-card__preview-copy">{isHovered ? (previewLoadingSlug === article.slug ? <span>正在读取正文…</span> : previews[article.slug]?.map((line, lineIndex) => <span key={`${article.slug}-preview-${lineIndex}`}>{line}</span>)) : null}</div></div>
+                          <div className="article-list-card__preview" aria-live="polite"><div className="article-list-card__preview-copy">{previewLoadingSlug === article.slug && !previews[article.slug]?.length ? <span>正在读取正文…</span> : previews[article.slug]?.map((line, lineIndex) => <span key={`${article.slug}-preview-${lineIndex}`}>{line}</span>)}</div></div>
                         </div>
                         <div className="article-list-card__bottom-bar" aria-hidden="true" />
                       </>
@@ -1209,7 +1506,7 @@ function ArticleListPage({ onOpenArticle }: { onOpenArticle: (slug: string) => v
                       <>
                         <h2>{article.title}</h2>
                         {article.summary ? <p>{article.summary}</p> : null}
-                        <div className="article-list-card__preview" aria-live="polite"><div className="article-list-card__preview-copy">{isHovered ? (previewLoadingSlug === article.slug ? <span>正在读取正文…</span> : previews[article.slug]?.map((line, lineIndex) => <span key={`${article.slug}-preview-${lineIndex}`}>{line}</span>)) : null}</div></div>
+                        <div className="article-list-card__preview" aria-live="polite"><div className="article-list-card__preview-copy">{previewLoadingSlug === article.slug && !previews[article.slug]?.length ? <span>正在读取正文…</span> : previews[article.slug]?.map((line, lineIndex) => <span key={`${article.slug}-preview-${lineIndex}`}>{line}</span>)}</div></div>
                         <div className="article-list-card__bottom">
                           <div className="article-list-card__tags">{article.tags.map((tag) => <span key={tag}>{tag}</span>)}</div>
                           <span className="article-list-card__arrow">↗</span>
@@ -1223,6 +1520,14 @@ function ArticleListPage({ onOpenArticle }: { onOpenArticle: (slug: string) => v
           </div>
         ) : null}
 
+        { (status === "ready" || status === "fallback") && visibleArticles.length === 0 ? <p className="article-state">该时间段暂无文章。</p> : null}
+        { (status === "ready" || status === "fallback") && visibleArticles.length > 0 ? (
+          <div className="article-timeline-footer" aria-hidden="true">
+            <div className="article-timeline-progress" onPointerDown={handleProgressTrackPointerDown}>
+              <span className="article-timeline-progress__bar" style={{ "--timeline-progress": `${Math.round(scrollProgress * 100)}%` } as React.CSSProperties} />
+            </div>
+          </div>
+        ) : null}
         {status !== "loading" && totalPages > 1 ? (
           <nav className="article-pagination" aria-label="文章列表分页">
             <button type="button" onClick={() => goToPage(currentPage - 1)} disabled={currentPage === 0}>上一页</button>
@@ -1520,25 +1825,27 @@ function SiteApp() {
     if (!pendingNavigationScrollRef.current) return;
     pendingNavigationScrollRef.current = false;
 
-    let timer: number | undefined;
+
+
     const applyNavigationScroll = () => {
       const cover = document.querySelector<HTMLElement>(".cover-space");
       const targetTop = cover?.offsetHeight ?? 0;
       const header = document.querySelector<HTMLElement>(".site-header");
       const resolvedTop = targetTop || header?.offsetTop || 0;
-      window.scrollTo(0, resolvedTop);
+      window.scrollTo({ top: resolvedTop, behavior: "instant" });
       document.documentElement.scrollTop = resolvedTop;
       document.body.scrollTop = resolvedTop;
     };
 
     const frame = window.requestAnimationFrame(() => {
       applyNavigationScroll();
-      timer = window.setTimeout(applyNavigationScroll, 80);
+
+
     });
 
     return () => {
       window.cancelAnimationFrame(frame);
-      if (timer !== undefined) window.clearTimeout(timer);
+      window.cancelAnimationFrame(frame);
     };
   }, [activePage, selectedArticleSlug]);
 
@@ -1580,14 +1887,15 @@ function SiteApp() {
 
         <div className="workspace-shell shell">
           <div className={`home-page-layer ${activePage === "home" ? "" : "is-hidden"}`}>
-          <HomePage onPageChange={setActivePage} onOpenArticle={openArticle} onOpenChatter={() => openContentPage("chatter")} onOpenGuestbook={() => openContentPage("guestbook")} now={now} />
+          <HomePage onPageChange={openContentPage} onOpenArticle={openArticle} onOpenChatter={() => openContentPage("chatter")} onOpenGuestbook={() => openContentPage("guestbook")} now={now} />
           </div>
           {activePage === "projects" && <ProjectsPage />}
           {activePage === "chatter" && <ChatterPage currentUser={authUser} onRequestLogin={() => setAuthPanelOpen(true)} />}
           {activePage === "guestbook" && <GuestbookPage currentUser={authUser} onRequestLogin={() => setAuthPanelOpen(true)} />}
-          {activePage === "article" && (selectedArticleSlug
-            ? <ArticleDetailPage key={selectedArticleSlug} slug={selectedArticleSlug} onBack={() => setSelectedArticleSlug(null)} currentUser={authUser} onRequestLogin={() => setAuthPanelOpen(true)} />
-            : <ArticleListPage onOpenArticle={openArticle} />)}
+
+
+          <div className={`home-page-layer ${activePage === "article" && !selectedArticleSlug ? "" : "is-hidden"}`}><ArticleListPage onOpenArticle={openArticle} /></div>
+          {activePage === "article" && selectedArticleSlug ? <ArticleDetailPage key={selectedArticleSlug} slug={selectedArticleSlug} onBack={() => setSelectedArticleSlug(null)} currentUser={authUser} onRequestLogin={() => setAuthPanelOpen(true)} /> : null}
         </div>
 
         {activePage !== "article" ? <footer className="site-footer shell"><span>© 2026 StrIn</span><span>v.0.0.1</span></footer> : null}
