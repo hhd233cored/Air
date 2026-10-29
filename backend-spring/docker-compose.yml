@@ -26,6 +26,8 @@ services:
     environment:
       SPRING_PROFILES_ACTIVE: local
       SERVER_PORT: 8081
+      WIKIPEDIA_ON_THIS_DAY_URL: ${WIKIPEDIA_ON_THIS_DAY_URL:-https://api.wikimedia.org/feed/v1/wikipedia/zh/onthisday/all}
+      WIKIPEDIA_TIME_ZONE: ${WIKIPEDIA_TIME_ZONE:-Asia/Shanghai}
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/air_spring_dev
       SPRING_DATASOURCE_USERNAME: ${SPRING_DATASOURCE_USERNAME:-airchord_local}
       SPRING_DATASOURCE_PASSWORD: ${SPRING_DATASOURCE_PASSWORD:?请先将 .env.example 复制为 .env 并填写本机密码}

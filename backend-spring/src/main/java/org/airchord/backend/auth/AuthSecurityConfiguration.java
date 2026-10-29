@@ -129,6 +129,7 @@ public class AuthSecurityConfiguration {
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                         .requestMatchers(HttpMethod.GET,
                                 "/api/v1/health",
+                                "/api/v1/historical-today",
                                 "/api/v1/articles", "/api/v1/articles/**",
                                 "/api/v1/chatter", "/api/v1/chatter/**",
                                 "/api/v1/search",

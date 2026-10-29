@@ -79,6 +79,7 @@ Invoke-RestMethod http://localhost:8081/api/v1/health
 | 接口 | 用途 |
 | --- | --- |
 | `GET /api/v1/health` | 返回 `{"status":"UP"}` |
+| `GET /api/v1/historical-today` | 从 Wikimedia 中文维基 feed 读取当天事件，按小时缓存并返回 `date`、`fetchedAt`、`available`、`events`；上游失败时返回 `available=false` |
 | `GET /api/v1/articles?page=0&size=10&tag=...&q=...` | 已发布文章分页，可按标签及关键词筛选 |
 | `GET /api/v1/articles/{slug}` | 已发布文章详情，包含 `contentMarkdown` |
 | `GET /api/v1/articles/{slug}/stats` | 浏览数、点赞数及当前账号是否已点赞 |
