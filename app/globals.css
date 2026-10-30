@@ -2735,9 +2735,6 @@ audio { display: none; }
 }
 
 .chess-control-card {
-  min-height: 274px;
-  height: auto;
-  justify-content: space-between;
   flex-shrink: 0;
 }
 
@@ -2814,9 +2811,12 @@ audio { display: none; }
 .chess-settings-panel {
   display: flex;
   flex-direction: column;
-  justify-content: center;
+  justify-content: flex-start;
   gap: 9px;
-  height: 112px;
+  height: 224px;
+  flex-shrink: 0;
+  overflow-y: auto;
+  scrollbar-width: thin;
   box-sizing: border-box;
   padding: 4px 0 10px;
   border-radius: 0;
@@ -2882,10 +2882,7 @@ audio { display: none; }
 
 /* Online Panel */
 .chess-online-panel {
-  gap: 11px;
-  height: auto;
-  min-height: 112px;
-  justify-content: flex-start;
+  gap: 9px;
 }
 
 .chess-online-request {
@@ -2939,20 +2936,6 @@ audio { display: none; }
   line-height: 1.4;
 }
 
-.chess-input-field {
-  display: flex;
-  flex-direction: column;
-  gap: 5px;
-}
-
-.chess-input-field span {
-  font-family: "SimSun", "Songti SC", "Noto Serif SC", serif;
-  font-size: 12px;
-  font-weight: 700;
-  color: #6e6254;
-}
-
-.chess-input-field input,
 .chess-room-input {
   width: 100%;
   border-radius: 6px;
@@ -2965,7 +2948,6 @@ audio { display: none; }
   transition: border-color 0.16s ease, background-color 0.16s ease;
 }
 
-.chess-input-field input:focus,
 .chess-room-input:focus {
   border-color: #4a6b5d;
   background: rgba(255, 252, 245, 0.72);
@@ -2973,7 +2955,7 @@ audio { display: none; }
 
 .chess-online-room-row {
   display: grid;
-  grid-template-columns: 1fr auto auto;
+  grid-template-columns: minmax(0, 1fr) auto auto;
   gap: 6px;
   align-items: center;
 }

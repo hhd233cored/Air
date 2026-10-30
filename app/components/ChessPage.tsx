@@ -15,9 +15,8 @@ import {
   type PieceColor,
   type PieceType,
   RANKS,
-  SoundEffects,
 } from "../lib/chess/engine";
-import { makeInvitationUrl, OnlineChessClient, type OnlineCredentials, type ServerGameState } from "../lib/chess/online";
+import { OnlineChessClient, type OnlineCredentials, type ServerGameState } from "../lib/chess/online";
 
 export type ChessMode = "ai" | "local" | "online";
 type OnlineConnectionState = "idle" | "connecting" | "connected" | "error" | "expired";
@@ -88,14 +87,12 @@ export function PieceGraphic({ type, color }: { type: PieceType; color: PieceCol
 
 export function ChessPage() {
   const gameRef = useRef<ChessGame>(new ChessGame());
-  const sfxRef = useRef<SoundEffects | null>(null);
   const boardElRef = useRef<HTMLDivElement | null>(null);
   const moveListElRef = useRef<HTMLOListElement | null>(null);
   const dragGhostRef = useRef<HTMLDivElement | null>(null);
   const aiTimerRef = useRef<number | null>(null);
   const onlineClientRef = useRef<OnlineChessClient | null>(null);
   const serverStateRef = useRef<ServerGameState | null>(null);
-  const soundForMoveRef = useRef<(prevLen: number) => void>(() => {});
   const onlineBusyRef = useRef(false);
 
   const [viewState, setViewState] = useState<BoardViewSnapshot>(() => createBoardViewSnapshot(new ChessGame()));
@@ -115,7 +112,6 @@ export function ChessPage() {
   const [onlineState, setOnlineState] = useState<ServerGameState | null>(null);
   const [onlineClock, setOnlineClock] = useState(0);
   const [onlineBusy, setOnlineBusy] = useState(false);
-  const [invitationLink, setInvitationLink] = useState("");
   const [onlineStatus, setOnlineStatus] = useState<OnlineConnectionState>("idle");
   const [onlineMessage, setOnlineMessage] = useState<string>("");
   const [credentials, setCredentials] = useState<OnlineCredentials | null>(null);
@@ -147,42 +143,6 @@ export function ChessPage() {
   const syncView = useCallback(() => {
     setViewState(createBoardViewSnapshot(gameRef.current, serverStateRef.current?.status));
   }, []);
-
-  const getSfx = useCallback(() => {
-    if (!sfxRef.current) {
-      sfxRef.current = new SoundEffects();
-    }
-    return sfxRef.current;
-  }, []);
-
-  const playSoundForLastMove = useCallback(
-    (prevLen: number) => {
-      const game = gameRef.current;
-      const sfx = getSfx();
-      if (game.history.length <= prevLen) return;
-      const lastEntry = game.history[game.history.length - 1];
-      const status = game.getGameStatus();
-
-      if (status.over) {
-        const isWin =
-          status.result === "draw"
-            ? false
-            : mode === "local"
-              ? true
-              : status.result === playerColor;
-        sfx.playGameOver(isWin);
-      } else if (status.inCheck) {
-        sfx.playCheck();
-      } else if (lastEntry?.move.isCastle) {
-        sfx.playCastle();
-      } else if (lastEntry?.move.captured) {
-        sfx.playCapture();
-      } else {
-        sfx.playMove();
-      }
-    },
-    [getSfx, mode, playerColor]
-  );
 
   const animateBoardMove = useCallback((move: ChessMove, callback: () => void) => {
     const boardEl = boardElRef.current;
@@ -227,10 +187,6 @@ export function ChessPage() {
     });
   }, []);
 
-  useEffect(() => {
-    soundForMoveRef.current = playSoundForLastMove;
-  }, [playSoundForLastMove]);
-
   const loadServerState = useCallback(
     (state: ServerGameState, isInitial = false) => {
       const previous = serverStateRef.current;
@@ -246,8 +202,6 @@ export function ChessPage() {
         roomUrl.searchParams.set("game", state.id);
         roomUrl.hash = "";
         window.history.replaceState(window.history.state, "", roomUrl);
-        setInvitationLink(state.credentials?.inviteToken
-          ? makeInvitationUrl(window.location.href, state.id, state.credentials.inviteToken) : "");
       }
       if (state.playerColor) {
         setPlayerColor(state.playerColor);
@@ -271,10 +225,7 @@ export function ChessPage() {
       setLegalMovesForSelected([]);
       setPendingPromotionMoves(null);
       if (!isInitial && game.history.length > prevLen) {
-        animateBoardMove(game.history[game.history.length - 1].move, () => {
-          syncView();
-          soundForMoveRef.current(prevLen);
-        });
+        animateBoardMove(game.history[game.history.length - 1].move, syncView);
       } else {
         syncView();
       }
@@ -376,11 +327,9 @@ export function ChessPage() {
       const aiMove = game.computeBestMove(difficulty);
       if (!aiMove) return;
 
-      const prevLen = game.history.length;
       animateBoardMove(aiMove, () => {
         game.makeMove(aiMove, { recordSAN: true });
         syncView();
-        playSoundForLastMove(prevLen);
       });
     }, 260);
 
@@ -390,7 +339,7 @@ export function ChessPage() {
         aiTimerRef.current = null;
       }
     };
-  }, [aiThinking, animateBoardMove, difficulty, playSoundForLastMove, syncView]);
+  }, [aiThinking, animateBoardMove, difficulty, syncView]);
 
   const isPlayerTurn = useCallback(() => {
     const game = gameRef.current;
@@ -417,14 +366,12 @@ export function ChessPage() {
       }
 
       const game = gameRef.current;
-      const prevLen = game.history.length;
       animateBoardMove(move, () => {
         game.makeMove(move, { recordSAN: true });
         if (mode === "local" && autoFlipLocal) {
           setFlipped(game.turn === "b");
         }
         syncView();
-        playSoundForLastMove(prevLen);
       });
     },
     [
@@ -432,7 +379,6 @@ export function ChessPage() {
       autoFlipLocal,
       mode,
       sendOnlineCommand,
-      playSoundForLastMove,
       syncView,
     ]
   );
@@ -443,9 +389,8 @@ export function ChessPage() {
       const legalMoves = game.getLegalMovesForSquare(r, c);
       setSelectedSquare({ r, c });
       setLegalMovesForSelected(legalMoves);
-      getSfx().playSelect();
     },
-    [getSfx]
+    []
   );
 
   const clearSelection = useCallback(() => {
@@ -576,7 +521,6 @@ export function ChessPage() {
 
   const handleSquarePointerDown = (e: React.PointerEvent<HTMLDivElement>, r: number, c: number) => {
     if (e.button !== 0 || pendingPromotionMoves) return;
-    getSfx().init();
 
     const game = gameRef.current;
     const piece = game.board[r][c];
@@ -628,14 +572,12 @@ export function ChessPage() {
       } else if (nextMode === "local") {
         setFlipped(false);
       }
-      getSfx().playSelect();
       syncView();
     },
     [
       closeOnlineStream,
       createOnlineRoom,
       credentials,
-      getSfx,
       mode,
       onlineGameId,
       onlineState,
@@ -671,13 +613,11 @@ export function ChessPage() {
     }
 
     clearSelection();
-    getSfx().playSelect();
     syncView();
   }, [
     aiThinking,
     autoFlipLocal,
     clearSelection,
-    getSfx,
     mode,
     sendOnlineCommand,
     pendingPromotionMoves,
@@ -724,7 +664,7 @@ export function ChessPage() {
         setCopiedFeedback((prev) => (prev === label ? null : prev));
       }, 2000);
     } catch {
-      setOnlineMessage("浏览器未允许复制，请选中下方邀请链接手动复制。");
+      setOnlineMessage("复制失败，请检查浏览器的剪贴板权限后重试。");
     }
   };
 
@@ -788,7 +728,7 @@ export function ChessPage() {
     : onlineStatus === "error" ? "连接中断，正在自动重连；棋局已保留。"
     : !onlineGameId ? "创建房间并分享邀请链接，或粘贴对方的完整邀请链接加入。"
     : !credentials?.humanToken ? "当前为观战模式；参与对局请使用创建者的完整邀请链接。"
-    : onlineState?.phase === "waiting" ? "等待对手入座：请复制邀请链接，让对方在另一浏览器或设备中打开。"
+    : onlineState?.phase === "waiting" ? "等待对手"
     : `你执${playerColor === "w" ? "白" : "黑"} · ${onlineState?.presence?.[opponentColor] ? "对手在线" : "对手暂时离线，棋局保留"}`;
   const remainingSeconds = onlineState?.remainingSeconds === undefined ? null : Math.max(0,
     Math.ceil(onlineState.remainingSeconds - Math.max(0, onlineClock - (onlineState.clientReceivedAt ?? onlineClock)) / 1000));
@@ -983,7 +923,7 @@ export function ChessPage() {
             <div className="chess-card-header">
               <div>
                 <p className="card-kicker">Atelier Chess / 05</p>
-                <h2>对局手记</h2>
+                <h2>设置</h2>
               </div>
               <span className="chess-turn-Readout">
                 {status.over
@@ -1084,9 +1024,6 @@ export function ChessPage() {
                     </button>
                   </div>
                 </div>
-                <p className="chess-mode-hint">
-                  本地双人同屏对弈已启用：白黑双方轮流在同一棋盘落子，支持随时悔棋与手动旋转棋盘。
-                </p>
               </div>
             ) : null}
 
@@ -1166,20 +1103,13 @@ export function ChessPage() {
                     </button>
                   </div>
                 ) : null}
-                {invitationLink && onlineState?.phase !== "expired" ? (
-                  <label className="chess-input-field">
-                    <span>邀请链接（可选中复制）</span>
-                    <input aria-label="邀请链接" readOnly value={invitationLink}
-                      onFocus={event => event.currentTarget.select()} />
-                  </label>
-                ) : null}
                 <div className="chess-online-status-row" role="status" aria-live="polite">
                   <span className={`chess-online-dot is-${onlineStatus}`} />
                   <span className="chess-online-status-text">{onlineMessage || onlineHint}</span>
                 </div>
                 {remainingSeconds !== null && onlineState?.phase !== "expired" ? (
                   <p className={`chess-mode-hint ${nearExpiration ? "chess-expiry-warning" : ""}`}>
-                    房间剩余 <time aria-label="房间剩余有效时间">{remainingLabel}</time> · 操作和重连不会续期
+                    房间剩余 <time aria-label="房间剩余有效时间">{remainingLabel}</time>
                   </p>
                 ) : null}
                 {nearExpiration ? <p className="chess-mode-hint chess-expiry-warning" role="status">房间将在 5 分钟内关闭，棋谱会保留。</p> : null}
@@ -1237,7 +1167,6 @@ export function ChessPage() {
                 className="chess-action-btn"
                 onClick={() => {
                   setFlipped((f) => !f);
-                  getSfx().playSelect();
                 }}
               >
                 <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="1.8">
