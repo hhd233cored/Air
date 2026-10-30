@@ -19,14 +19,18 @@ export interface ServerGameState {
   positionCounts?: Record<string, number>;
   status?: GameStatus;
   history: MoveRecord[];
-  phase: "waiting" | "playing" | "finished";
+  phase: "waiting" | "playing" | "finished" | "expired";
+  expiresAt?: string;
+  serverTime?: string;
+  remainingSeconds?: number;
+  clientReceivedAt?: number;
   presence?: { w: boolean; b: boolean };
   pendingAction?: { id: string; type: "undo" | "reset" | "draw"; by: PieceColor } | null;
   credentials?: OnlineCredentials;
   inviteToken?: string;
 }
 
-type ConnectionState = "idle" | "connecting" | "connected" | "error";
+type ConnectionState = "idle" | "connecting" | "connected" | "error" | "expired";
 type Stream = Pick<EventSource, "addEventListener" | "close" | "readyState" | "onopen" | "onerror">;
 type Storage = Pick<globalThis.Storage, "getItem" | "setItem">;
 
@@ -44,6 +48,7 @@ const ERROR_MESSAGES: Record<string, string> = {
   no_matching_action: "这条请求已经失效，已同步最新棋局。",
   no_moves: "当前没有可以撤回的走棋。",
   rate_limited: "请求过于频繁，请稍后重试。",
+  room_expired: "房间已满有效期，联机已关闭，棋谱仍可查看；请创建新房间。",
 };
 
 export class ChessApiError extends Error {
@@ -85,6 +90,7 @@ interface Options {
   onConnection: (state: ConnectionState) => void;
   fetch?: typeof fetch;
   openStream?: (url: string) => Stream;
+  now?: () => number;
 }
 
 /** Owns a room connection independently of React renders and board selection. */
@@ -99,6 +105,8 @@ export class OnlineChessClient {
   private stream: Stream | null = null;
   private heartbeat: ReturnType<typeof setInterval> | null = null;
   private lastActivity = 0;
+  private expiryTimer: ReturnType<typeof setTimeout> | null = null;
+  private expiryDeadline: number | null = null;
 
   constructor(options: Options) {
     this.options = options;
@@ -138,10 +146,68 @@ export class OnlineChessClient {
 
   private accept(state: ServerGameState, initial = false) {
     if (state.id !== this.room || (this.state && state.version < this.state.version)) return;
+    const receivedAt = (this.options.now || (() => performance.now()))();
+    let remaining = state.remainingSeconds;
+    if (remaining === undefined && state.expiresAt && state.serverTime) {
+      remaining = (Date.parse(state.expiresAt) - Date.parse(state.serverTime)) / 1000;
+    }
+    if (remaining === undefined && this.expiryDeadline !== null) {
+      remaining = Math.max(0, (this.expiryDeadline - receivedAt) / 1000);
+    }
+    if (remaining !== undefined && Number.isFinite(remaining)) {
+      const deadline = receivedAt + Math.max(0, remaining) * 1000;
+      // A new snapshot must never extend this connection's fixed deadline.
+      this.expiryDeadline = Math.min(this.expiryDeadline ?? deadline, deadline);
+      remaining = Math.max(0, (this.expiryDeadline - receivedAt) / 1000);
+      if (remaining === 0) state = { ...state, phase: "expired" };
+    }
     this.color = state.playerColor || state.humanColor || this.color;
     this.state = { ...state, playerColor: this.color, humanColor: this.color,
+      remainingSeconds: remaining, clientReceivedAt: receivedAt,
       credentials: this.session || undefined };
+    if (this.state.phase === "expired") {
+      this.state = this.expiredSnapshot(this.state);
+      this.stopTransport();
+      this.generation++;
+      this.options.onState(this.state, initial);
+      this.options.onConnection("expired");
+      return;
+    }
     this.options.onState(this.state, initial);
+    if (this.expiryTimer) clearTimeout(this.expiryTimer);
+    if (remaining !== undefined && Number.isFinite(remaining)) {
+      this.expiryTimer = setTimeout(() => this.expireLocally(true), remaining * 1000);
+    }
+  }
+
+  private expiredSnapshot(state: ServerGameState): ServerGameState {
+    return { ...state, phase: "expired", remainingSeconds: 0, pendingAction: null,
+      status: state.status?.over ? state.status : {
+        over: true, result: null, reason: "expired", inCheck: state.status?.inCheck ?? false,
+        title: "房间已过期", subtitle: "联机已关闭，棋谱已保留",
+      } };
+  }
+
+  private expireLocally(refresh = false) {
+    if (!this.state) return;
+    this.accept(this.expiredSnapshot(this.state));
+    if (refresh) {
+      const generation = this.generation;
+      // One final read can recover a move whose HTTP/SSE response arrived after the deadline.
+      // This does not reopen a stream or retry joining the room.
+      void this.request<ServerGameState>(`/api/games/${encodeURIComponent(this.room)}`, undefined, this.session?.humanToken)
+        .then(state => { if (generation === this.generation) this.accept(this.expiredSnapshot(state)); })
+        .catch(() => {});
+    }
+  }
+
+  private async recoverExpired(path: string, generation: number) {
+    try {
+      const state = await this.request<ServerGameState>(path, undefined, this.session?.humanToken);
+      if (generation === this.generation) this.accept(state);
+    } finally {
+      if (generation === this.generation) this.expireLocally();
+    }
   }
 
   async create(color: PieceColor) {
@@ -165,9 +231,10 @@ export class OnlineChessClient {
     this.options.onConnection("connecting");
     const path = `/api/games/${encodeURIComponent(id)}`;
     let state: ServerGameState;
-    if (this.session?.humanToken) {
-      state = await this.request<ServerGameState>(`${path}/me`, undefined, this.session.humanToken);
-    } else if (inviteToken) {
+    try {
+      if (this.session?.humanToken) {
+        state = await this.request<ServerGameState>(`${path}/me`, undefined, this.session.humanToken);
+      } else if (inviteToken) {
       // Persist the chosen token before joining; a lost response can be safely retried.
       const pendingKey = `${this.key(id)}:joining`;
       const token = this.options.storage.getItem(pendingKey)
@@ -177,26 +244,42 @@ export class OnlineChessClient {
       if (generation !== this.generation) return;
       this.session = { humanToken: token };
       this.saveSession(id, this.session);
-    } else {
+      } else {
       // A room ID alone is a spectator link, never a player credential.
+        state = await this.request<ServerGameState>(path);
+      }
+    } catch (error) {
+      if (!(error instanceof ChessApiError) || error.code !== "room_expired") throw error;
+      if (generation !== this.generation) return;
       state = await this.request<ServerGameState>(path);
     }
     if (generation !== this.generation) return;
     this.accept(state, true);
+    if (state.phase === "expired" || generation !== this.generation) return;
     const stream = (this.options.openStream || ((url) => new EventSource(url)))(`${this.base}${path}/events`);
     this.stream = stream;
     const ping = () => {
       if (generation !== this.generation || !this.session?.humanToken
         || stream.readyState !== 1 || Date.now() - this.lastActivity > 30_000) return;
-      void this.request(`${path}/heartbeat`, {}, this.session.humanToken).catch(() => {});
+      void this.request(`${path}/heartbeat`, {}, this.session.humanToken).catch(error => {
+        if (generation === this.generation && error instanceof ChessApiError && error.code === "room_expired") {
+          void this.recoverExpired(path, generation).catch(() => {});
+        }
+      });
     };
     stream.addEventListener("state", (event) => {
       if (generation !== this.generation) return;
       try {
         this.accept(JSON.parse((event as MessageEvent).data));
         this.lastActivity = Date.now();
-        this.options.onConnection("connected");
+        if (generation === this.generation) this.options.onConnection("connected");
       } catch { /* A subsequent full snapshot can recover a malformed event. */ }
+    });
+    stream.addEventListener("expired", event => {
+      if (generation !== this.generation) return;
+      try { this.accept(JSON.parse((event as MessageEvent).data)); }
+      catch { /* A terminal event still closes the connection if its snapshot is malformed. */ }
+      finally { if (generation === this.generation) this.expireLocally(); }
     });
     stream.addEventListener("heartbeat", () => {
       if (generation !== this.generation) return;
@@ -209,9 +292,21 @@ export class OnlineChessClient {
       this.options.onConnection("connected");
       ping();
     };
+    let checkingExpiry = false;
     stream.onerror = () => {
-      if (generation === this.generation) this.options.onConnection("error");
-      // Leave EventSource open so the browser can reconnect automatically.
+      if (generation !== this.generation) return;
+      this.options.onConnection("error");
+      // EventSource cannot expose a 410 body. Check the read-only snapshot on failure,
+      // including rooms opened before this server version supplied expiry metadata.
+      if (!checkingExpiry) {
+        checkingExpiry = true;
+        void this.request<ServerGameState>(path, undefined, this.session?.humanToken)
+          .then(state => { if (generation === this.generation) this.accept(state); })
+          .catch(error => {
+            if (generation === this.generation && error instanceof ChessApiError && error.code === "room_expired") this.expireLocally();
+          }).finally(() => { checkingExpiry = false; });
+      }
+      // Active rooms keep the native automatic reconnect; expired rooms close in accept().
     };
     this.heartbeat = setInterval(() => {
       if (Date.now() - this.lastActivity > 30_000) this.options.onConnection("error");
@@ -220,6 +315,8 @@ export class OnlineChessClient {
   }
 
   async command(action: "moves" | "undo" | "reset" | "actions/respond", fields: Record<string, unknown> = {}) {
+    if (this.expiryDeadline !== null && (this.options.now || (() => performance.now()))() >= this.expiryDeadline) this.expireLocally();
+    if (this.state?.phase === "expired") throw new ChessApiError(410, "room_expired");
     if (!this.session?.humanToken || !this.state) throw new Error("当前为观战模式，请通过邀请链接领取席位。");
     if (this.state.phase === "waiting") throw new Error(ERROR_MESSAGES.waiting_for_opponent);
     const generation = this.generation;
@@ -233,6 +330,10 @@ export class OnlineChessClient {
         return;
       } catch (error) {
         if (generation !== this.generation) return;
+        if (error instanceof ChessApiError && error.code === "room_expired") {
+          await this.recoverExpired(path, generation).catch(() => {});
+          throw error;
+        }
         if (!(error instanceof ChessApiError) && attempt === 0) continue;
         if (error instanceof ChessApiError && error.status === 409 && generation === this.generation) {
           this.accept(await this.request<ServerGameState>(`${path}/me`, undefined, token));
@@ -247,12 +348,19 @@ export class OnlineChessClient {
     return makeInvitationUrl(pageUrl, this.room, this.session.inviteToken);
   }
 
-  disconnect() {
-    this.generation++;
+  private stopTransport() {
     this.stream?.close();
     this.stream = null;
     if (this.heartbeat) clearInterval(this.heartbeat);
     this.heartbeat = null;
+    if (this.expiryTimer) clearTimeout(this.expiryTimer);
+    this.expiryTimer = null;
+    this.expiryDeadline = null;
+  }
+
+  disconnect() {
+    this.generation++;
+    this.stopTransport();
     this.options.onConnection("idle");
   }
 }

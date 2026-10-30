@@ -20,7 +20,7 @@ import {
 import { makeInvitationUrl, OnlineChessClient, type OnlineCredentials, type ServerGameState } from "../lib/chess/online";
 
 export type ChessMode = "ai" | "local" | "online";
-type OnlineConnectionState = "idle" | "connecting" | "connected" | "error";
+type OnlineConnectionState = "idle" | "connecting" | "connected" | "error" | "expired";
 
 interface BoardViewSnapshot {
   board: (ChessPiece | null)[][];
@@ -113,6 +113,7 @@ export function ChessPage() {
   const [onlineGameId, setOnlineGameId] = useState<string | null>(null);
   const [roomInput, setRoomInput] = useState<string>("");
   const [onlineState, setOnlineState] = useState<ServerGameState | null>(null);
+  const [onlineClock, setOnlineClock] = useState(0);
   const [onlineBusy, setOnlineBusy] = useState(false);
   const [invitationLink, setInvitationLink] = useState("");
   const [onlineStatus, setOnlineStatus] = useState<OnlineConnectionState>("idle");
@@ -253,7 +254,8 @@ export function ChessPage() {
         if (isInitial) setFlipped(state.playerColor === "b");
       }
       // Presence updates have the same board version: keep the player's selection intact.
-      if (!isInitial && previous?.id === state.id && previous.version === state.version) return;
+      if (!isInitial && previous?.id === state.id && previous.version === state.version
+        && previous.phase === state.phase) return;
       setOnlineMessage("");
       const game = gameRef.current;
       const prevLen = game.history.length;
@@ -347,6 +349,12 @@ export function ChessPage() {
       if (onlineClientRef.current === client) onlineClientRef.current = null;
     };
   }, [loadServerState]);
+
+  useEffect(() => {
+    if (mode !== "online" || !onlineState?.expiresAt || onlineState.phase === "expired") return;
+    const timer = window.setInterval(() => setOnlineClock(performance.now()), 1000);
+    return () => window.clearInterval(timer);
+  }, [mode, onlineState?.expiresAt, onlineState?.phase]);
 
   // Auto-scroll move history
   useEffect(() => {
@@ -603,7 +611,8 @@ export function ChessPage() {
       setPendingPromotionMoves(null);
 
       if (nextMode === "online") {
-        if (onlineGameId && credentials?.humanToken && onlineState?.phase !== "waiting") {
+        if (onlineGameId && credentials?.humanToken
+          && (onlineState?.phase === "playing" || onlineState?.phase === "finished")) {
           await sendOnlineCommand("reset");
         } else {
           await createOnlineRoom(nextPlayerColor);
@@ -774,11 +783,17 @@ export function ChessPage() {
 
   const selectedPiece = selectedSquare ? board[selectedSquare.r][selectedSquare.c] : null;
   const opponentColor = playerColor === "w" ? "b" : "w";
-  const onlineHint = onlineStatus === "error" ? "连接中断，正在自动重连；棋局已保留。"
+  const onlineHint = onlineState?.phase === "expired" || onlineStatus === "expired"
+    ? "房间已过期，联机已关闭；棋谱已保留，请创建新房间继续对局。"
+    : onlineStatus === "error" ? "连接中断，正在自动重连；棋局已保留。"
     : !onlineGameId ? "创建房间并分享邀请链接，或粘贴对方的完整邀请链接加入。"
     : !credentials?.humanToken ? "当前为观战模式；参与对局请使用创建者的完整邀请链接。"
     : onlineState?.phase === "waiting" ? "等待对手入座：请复制邀请链接，让对方在另一浏览器或设备中打开。"
     : `你执${playerColor === "w" ? "白" : "黑"} · ${onlineState?.presence?.[opponentColor] ? "对手在线" : "对手暂时离线，棋局保留"}`;
+  const remainingSeconds = onlineState?.remainingSeconds === undefined ? null : Math.max(0,
+    Math.ceil(onlineState.remainingSeconds - Math.max(0, onlineClock - (onlineState.clientReceivedAt ?? onlineClock)) / 1000));
+  const nearExpiration = remainingSeconds !== null && remainingSeconds <= 300 && onlineState?.phase !== "expired";
+  const remainingLabel = remainingSeconds === null ? "" : `${Math.floor(remainingSeconds / 60)}:${String(remainingSeconds % 60).padStart(2, "0")}`;
 
   return (
     <section className="chess-page-shell chess-theme-walnut" aria-label="Atelier Chess 国际象棋对局室">
@@ -1129,7 +1144,7 @@ export function ChessPage() {
                     <button
                       type="button"
                       className="chess-share-btn"
-                      disabled={!credentials?.inviteToken}
+                      disabled={!credentials?.inviteToken || onlineState?.phase === "expired"}
                       onClick={() => {
                         try {
                           copyTextWithFeedback(onlineClientRef.current!.invitation(window.location.href), "link");
@@ -1151,7 +1166,7 @@ export function ChessPage() {
                     </button>
                   </div>
                 ) : null}
-                {invitationLink ? (
+                {invitationLink && onlineState?.phase !== "expired" ? (
                   <label className="chess-input-field">
                     <span>邀请链接（可选中复制）</span>
                     <input aria-label="邀请链接" readOnly value={invitationLink}
@@ -1162,6 +1177,12 @@ export function ChessPage() {
                   <span className={`chess-online-dot is-${onlineStatus}`} />
                   <span className="chess-online-status-text">{onlineMessage || onlineHint}</span>
                 </div>
+                {remainingSeconds !== null && onlineState?.phase !== "expired" ? (
+                  <p className={`chess-mode-hint ${nearExpiration ? "chess-expiry-warning" : ""}`}>
+                    房间剩余 <time aria-label="房间剩余有效时间">{remainingLabel}</time> · 操作和重连不会续期
+                  </p>
+                ) : null}
+                {nearExpiration ? <p className="chess-mode-hint chess-expiry-warning" role="status">房间将在 5 分钟内关闭，棋谱会保留。</p> : null}
                 {onlineGameId && credentials?.humanToken && !credentials.inviteToken && onlineState?.phase === "waiting" ? (
                   <p className="chess-mode-hint">旧房间未保存邀请信息，请创建新房间后邀请对手。</p>
                 ) : null}
@@ -1201,7 +1222,7 @@ export function ChessPage() {
               <button
                 type="button"
                 className="chess-action-btn"
-                disabled={history.length === 0 || aiThinking || (mode === "online" && (onlineBusy || !credentials?.humanToken || Boolean(onlineState?.pendingAction)))}
+                disabled={history.length === 0 || aiThinking || (mode === "online" && (onlineBusy || !credentials?.humanToken || onlineState?.phase === "expired" || Boolean(onlineState?.pendingAction)))}
                 onClick={() => void handleUndo()}
               >
                 <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="1.8">

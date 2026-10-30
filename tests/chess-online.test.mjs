@@ -19,9 +19,10 @@ class FakeStream extends EventTarget {
   closed = false;
   close() { this.closed = true; this.readyState = 2; }
   state(state) { this.dispatchEvent(new MessageEvent("state", { data: JSON.stringify(state) })); }
+  expired(state) { this.dispatchEvent(new MessageEvent("expired", { data: JSON.stringify(state) })); }
 }
 
-function harness(t, handle, entries = [[`airchess:${base}:${room}`, JSON.stringify({ humanToken: token })]]) {
+function harness(t, handle, entries = [[`airchess:${base}:${room}`, JSON.stringify({ humanToken: token })]], overrides = {}) {
   const storage = new Map(entries);
   const states = [];
   const connections = [];
@@ -39,6 +40,7 @@ function harness(t, handle, entries = [[`airchess:${base}:${room}`, JSON.stringi
       return handle(request, requests.length);
     },
     openStream: () => { const stream = new FakeStream(); streams.push(stream); return stream; },
+    ...overrides,
   });
   t.after(() => client.disconnect());
   return { client, states, storage, streams, requests, connections };
@@ -167,4 +169,81 @@ test("new room invitations include invitation data, never the player's bearer to
   assert.equal(new URL(invitation).searchParams.get("game"), room);
   assert.equal(new URL(invitation).hash, "#invite=invite-secret");
   assert.ok(!invitation.includes(token));
+});
+
+test("opening an expired room keeps the replay without starting a stream", async t => {
+  const h = harness(t, () => response(snapshot(3, { phase: "expired", history: [{ uci: "e2e4" }] })));
+  await h.client.connect(room);
+  assert.equal(h.streams.length, 0);
+  assert.equal(h.connections.at(-1), "expired");
+  assert.equal(h.states.at(-1).state.history[0].uci, "e2e4");
+  await assert.rejects(h.client.command("reset"), error => error.code === "room_expired");
+});
+
+test("expired SSE closes the connection and ignores late snapshots and reconnect events", async t => {
+  const h = harness(t, () => response(snapshot(1, { playerColor: "w" })));
+  await h.client.connect(room);
+  const stream = h.streams[0];
+  stream.expired(snapshot(1, { phase: "expired", remainingSeconds: 0 }));
+  assert.equal(stream.closed, true);
+  assert.equal(h.connections.at(-1), "expired");
+  stream.state(snapshot(9));
+  stream.onerror(new Event("error"));
+  assert.equal(h.states.at(-1).state.phase, "expired");
+  assert.equal(h.states.at(-1).state.status.reason, "expired");
+  assert.equal(h.connections.at(-1), "expired");
+});
+
+test("an expired invitation loads the read-only replay instead of retrying the join", async t => {
+  const h = harness(t, request => request.method === "POST"
+    ? response({ detail: { code: "room_expired" } }, 410)
+    : response(snapshot(2, { phase: "expired" })), []);
+  await h.client.connect(`http://localhost:3000/?game=${room}#invite=old-invitation`);
+  assert.equal(h.streams.length, 0);
+  assert.equal(h.states.at(-1).state.phase, "expired");
+  assert.equal(h.states.at(-1).state.credentials, undefined);
+});
+
+test("a move rejected with 410 fetches the retained record and stops the stream", async t => {
+  let reads = 0;
+  const h = harness(t, request => {
+    if (request.method === "POST") return response({ detail: { code: "room_expired" } }, 410);
+    return response(snapshot(++reads, { phase: reads > 1 ? "expired" : "playing", playerColor: "w" }));
+  });
+  await h.client.connect(room);
+  await assert.rejects(h.client.command("moves", { move: "e2e4" }), error => error.code === "room_expired");
+  assert.equal(h.streams[0].closed, true);
+  assert.equal(h.connections.at(-1), "expired");
+  assert.equal(h.requests.filter(r => r.method === "POST").length, 1);
+});
+
+test("SSE admission errors on a legacy room fetch expiry state instead of reconnecting forever", async t => {
+  let reads = 0;
+  const h = harness(t, () => response(snapshot(++reads, {
+    phase: reads > 1 ? "expired" : "playing", playerColor: "w",
+  })));
+  await h.client.connect(room);
+  h.streams[0].onerror(new Event("error"));
+  await new Promise(setImmediate);
+  assert.equal(h.connections.at(-1), "expired");
+  assert.equal(h.streams[0].closed, true);
+});
+
+test("the local deadline closes even an offline stream and snapshots cannot renew it", async t => {
+  t.mock.timers.enable({ apis: ["setTimeout", "setInterval"] });
+  let monotonicNow = 1000;
+  const h = harness(t, () => response(snapshot(1, {
+    playerColor: "w", expiresAt: "2026-10-30T12:00:05Z", serverTime: "2026-10-30T12:00:00Z",
+    remainingSeconds: 5,
+  })), undefined, { now: () => monotonicNow });
+  await h.client.connect(room);
+  monotonicNow += 4000;
+  t.mock.timers.tick(4000);
+  h.streams[0].state(snapshot(2, { remainingSeconds: 3600 }));
+  assert.equal(h.states.at(-1).state.remainingSeconds, 1);
+  monotonicNow += 1000;
+  t.mock.timers.tick(1000);
+  assert.equal(h.streams[0].closed, true);
+  assert.equal(h.connections.at(-1), "expired");
+  await assert.rejects(h.client.command("moves", { move: "e2e4" }), error => error.code === "room_expired");
 });

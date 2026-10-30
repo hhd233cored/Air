@@ -2924,6 +2924,14 @@ audio { display: none; }
   box-shadow: 0 0 0 3px rgba(181, 71, 58, 0.2);
 }
 
+.chess-online-dot.is-expired {
+  background: #988e82;
+}
+
+.chess-mode-hint.chess-expiry-warning {
+  color: #a35d24;
+}
+
 .chess-online-status-text {
   font-family: "SimSun", "Songti SC", "Noto Serif SC", serif;
   font-size: 12.5px;
