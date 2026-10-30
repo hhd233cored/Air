@@ -2735,7 +2735,8 @@ audio { display: none; }
 }
 
 .chess-control-card {
-  height: 274px;
+  min-height: 274px;
+  height: auto;
   justify-content: space-between;
   flex-shrink: 0;
 }
@@ -2882,6 +2883,14 @@ audio { display: none; }
 /* Online Panel */
 .chess-online-panel {
   gap: 11px;
+  height: auto;
+  min-height: 112px;
+  justify-content: flex-start;
+}
+
+.chess-online-request {
+  display: grid;
+  gap: 8px;
 }
 
 .chess-online-status-row {
@@ -2995,6 +3004,14 @@ audio { display: none; }
 .chess-secondary-btn:hover {
   background: rgba(96, 82, 66, 0.08);
   border-color: rgba(96, 82, 66, 0.5);
+}
+
+.chess-primary-btn:disabled,
+.chess-secondary-btn:disabled,
+.chess-share-btn:disabled {
+  opacity: 0.55;
+  cursor: default;
+  transform: none;
 }
 
 .chess-online-share {

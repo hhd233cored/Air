@@ -807,7 +807,7 @@ function HomePage({ onPageChange, onOpenArticle, onOpenChatter, onOpenGuestbook,
       })
       .catch(() => {
         if (usesDatabaseChatterContent) {
-          if (!cancelled) setStatus("error");
+          if (!cancelled) setChatterEntries([]);
           return;
         }
         getLocalChatterIndex()

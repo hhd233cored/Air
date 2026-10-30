@@ -17,33 +17,10 @@ import {
   RANKS,
   SoundEffects,
 } from "../lib/chess/engine";
+import { makeInvitationUrl, OnlineChessClient, type OnlineCredentials, type ServerGameState } from "../lib/chess/online";
 
 export type ChessMode = "ai" | "local" | "online";
 type OnlineConnectionState = "idle" | "connecting" | "connected" | "error";
-
-interface ServerGameState {
-  id: string;
-  version: number;
-  humanColor?: PieceColor;
-  board: (ChessPiece | null)[][];
-  turn: PieceColor;
-  castling: { wK: boolean; wQ: boolean; bK: boolean; bQ: boolean };
-  enPassant: BoardSquare | null;
-  halfMoveClock: number;
-  fullMoveNumber: number;
-  positionCounts?: Record<string, number>;
-  status?: GameStatus;
-  history: MoveRecord[];
-  credentials?: {
-    humanToken?: string;
-    agentToken?: string;
-  };
-}
-
-interface StoredCredentials {
-  humanToken?: string;
-  agentToken?: string;
-}
 
 interface BoardViewSnapshot {
   board: (ChessPiece | null)[][];
@@ -60,8 +37,12 @@ interface BoardViewSnapshot {
   fen: string;
 }
 
-function createBoardViewSnapshot(game: ChessGame): BoardViewSnapshot {
-  const status = game.getGameStatus();
+function createBoardViewSnapshot(game: ChessGame, serverStatus?: GameStatus | null): BoardViewSnapshot {
+  const status = serverStatus ? { ...game.getGameStatus(), ...serverStatus } : game.getGameStatus();
+  if (status.over && !status.title) {
+    status.title = status.result === "draw" ? "和棋" : status.result === "w" ? "白方胜" : "黑方胜";
+    status.subtitle = status.reason === "agreement" ? "双方同意和棋" : status.reason === "resignation" ? "对手认输" : "对局结束";
+  }
   const lastMove = game.history.length > 0 ? game.history[game.history.length - 1].move : null;
   const checkedKingSq = status.inCheck ? game.findKing(game.turn) : null;
   const { capturedByWhite, capturedByBlack, whiteAdvantage, blackAdvantage } = game.getMaterialAndCaptures();
@@ -92,10 +73,6 @@ const PROMO_NAMES: Record<PieceType, string> = {
 
 const SERVER_BASE_URL = (process.env.NEXT_PUBLIC_CHESS_API_BASE_URL || "").trim().replace(/\/+$/, "");
 
-function buildOnlineUrl(path: string): string {
-  return SERVER_BASE_URL ? `${SERVER_BASE_URL}${path}` : path;
-}
-
 export function PieceGraphic({ type, color }: { type: PieceType; color: PieceColor }) {
   const rect = PIECE_RECTS[color + type];
   if (!rect) return null;
@@ -116,7 +93,10 @@ export function ChessPage() {
   const moveListElRef = useRef<HTMLOListElement | null>(null);
   const dragGhostRef = useRef<HTMLDivElement | null>(null);
   const aiTimerRef = useRef<number | null>(null);
-  const sseRef = useRef<EventSource | null>(null);
+  const onlineClientRef = useRef<OnlineChessClient | null>(null);
+  const serverStateRef = useRef<ServerGameState | null>(null);
+  const soundForMoveRef = useRef<(prevLen: number) => void>(() => {});
+  const onlineBusyRef = useRef(false);
 
   const [viewState, setViewState] = useState<BoardViewSnapshot>(() => createBoardViewSnapshot(new ChessGame()));
   const [mode, setMode] = useState<ChessMode>("ai");
@@ -129,13 +109,15 @@ export function ChessPage() {
   const [legalMovesForSelected, setLegalMovesForSelected] = useState<ChessMove[]>([]);
   const [pendingPromotionMoves, setPendingPromotionMoves] = useState<ChessMove[] | null>(null);
 
-  // Online mode state (reserved for game backend connection)
+  // Connection lifecycle is owned by OnlineChessClient, independent of board renders.
   const [onlineGameId, setOnlineGameId] = useState<string | null>(null);
   const [roomInput, setRoomInput] = useState<string>("");
-  const [onlineVersion, setOnlineVersion] = useState<number>(0);
+  const [onlineState, setOnlineState] = useState<ServerGameState | null>(null);
+  const [onlineBusy, setOnlineBusy] = useState(false);
+  const [invitationLink, setInvitationLink] = useState("");
   const [onlineStatus, setOnlineStatus] = useState<OnlineConnectionState>("idle");
   const [onlineMessage, setOnlineMessage] = useState<string>("");
-  const [credentials, setCredentials] = useState<StoredCredentials | null>(null);
+  const [credentials, setCredentials] = useState<OnlineCredentials | null>(null);
   const [copiedFeedback, setCopiedFeedback] = useState<string | null>(null);
 
   const aiThinking = mode === "ai" && !viewState.status.over && viewState.turn !== playerColor;
@@ -162,7 +144,7 @@ export function ChessPage() {
   });
 
   const syncView = useCallback(() => {
-    setViewState(createBoardViewSnapshot(gameRef.current));
+    setViewState(createBoardViewSnapshot(gameRef.current, serverStateRef.current?.status));
   }, []);
 
   const getSfx = useCallback(() => {
@@ -170,28 +152,6 @@ export function ChessPage() {
       sfxRef.current = new SoundEffects();
     }
     return sfxRef.current;
-  }, []);
-
-  const saveCredentialsToStorage = useCallback((gameId: string, creds: StoredCredentials) => {
-    setCredentials(creds);
-    try {
-      const raw = window.localStorage.getItem("atelier_chess_tokens");
-      const all = raw ? (JSON.parse(raw) as Record<string, StoredCredentials>) : {};
-      all[gameId] = creds;
-      window.localStorage.setItem("atelier_chess_tokens", JSON.stringify(all));
-    } catch {
-      // Ignore storage errors
-    }
-  }, []);
-
-  const loadCredentialsFromStorage = useCallback((gameId: string): StoredCredentials | null => {
-    try {
-      const raw = window.localStorage.getItem("atelier_chess_tokens");
-      const all = raw ? (JSON.parse(raw) as Record<string, StoredCredentials>) : {};
-      return all[gameId] || null;
-    } catch {
-      return null;
-    }
   }, []);
 
   const playSoundForLastMove = useCallback(
@@ -266,20 +226,37 @@ export function ChessPage() {
     });
   }, []);
 
+  useEffect(() => {
+    soundForMoveRef.current = playSoundForLastMove;
+  }, [playSoundForLastMove]);
+
   const loadServerState = useCallback(
     (state: ServerGameState, isInitial = false) => {
-      const game = gameRef.current;
-      const prevLen = game.history.length;
-      const prevVersion = onlineVersion;
-
+      const previous = serverStateRef.current;
+      if (previous?.id === state.id && state.version < previous.version) return;
+      serverStateRef.current = state;
+      setOnlineState(state);
       setOnlineGameId(state.id);
       setRoomInput(state.id);
-      setOnlineVersion(state.version);
-
-      if (state.humanColor) {
-        setPlayerColor(state.humanColor);
+      setCredentials(state.credentials || null);
+      if (isInitial) {
+        const roomUrl = new URL(window.location.href);
+        roomUrl.searchParams.set("page", "chess");
+        roomUrl.searchParams.set("game", state.id);
+        roomUrl.hash = "";
+        window.history.replaceState(window.history.state, "", roomUrl);
+        setInvitationLink(state.credentials?.inviteToken
+          ? makeInvitationUrl(window.location.href, state.id, state.credentials.inviteToken) : "");
       }
-
+      if (state.playerColor) {
+        setPlayerColor(state.playerColor);
+        if (isInitial) setFlipped(state.playerColor === "b");
+      }
+      // Presence updates have the same board version: keep the player's selection intact.
+      if (!isInitial && previous?.id === state.id && previous.version === state.version) return;
+      setOnlineMessage("");
+      const game = gameRef.current;
+      const prevLen = game.history.length;
       game.board = state.board;
       game.turn = state.turn;
       game.castling = state.castling;
@@ -287,156 +264,89 @@ export function ChessPage() {
       game.halfMoveClock = state.halfMoveClock;
       game.fullMoveNumber = state.fullMoveNumber;
       game.positionCounts = state.positionCounts || {};
-      game.history = (state.history || []).map((h) => ({
-        move: h.move,
-        piece: h.piece,
-        san: h.san,
-        uci: h.uci,
-      }));
-
+      game.history = state.history.map(h => ({ move: h.move, piece: h.piece, san: h.san, uci: h.uci }));
       setSelectedSquare(null);
       setLegalMovesForSelected([]);
       setPendingPromotionMoves(null);
-
-      if (!isInitial && state.version > prevVersion && game.history.length > prevLen) {
-        const lastEntry = game.history[game.history.length - 1];
-        animateBoardMove(lastEntry.move, () => {
+      if (!isInitial && game.history.length > prevLen) {
+        animateBoardMove(game.history[game.history.length - 1].move, () => {
           syncView();
-          playSoundForLastMove(prevLen);
+          soundForMoveRef.current(prevLen);
         });
       } else {
         syncView();
       }
     },
-    [animateBoardMove, onlineVersion, playSoundForLastMove, syncView]
+    [animateBoardMove, syncView]
   );
 
   const closeOnlineStream = useCallback(() => {
-    if (sseRef.current) {
-      sseRef.current.close();
-      sseRef.current = null;
+    onlineClientRef.current?.disconnect();
+  }, []);
+
+  const runOnlineOperation = useCallback(async (operation: () => Promise<unknown>) => {
+    if (onlineBusyRef.current) return false;
+    onlineBusyRef.current = true;
+    setOnlineBusy(true);
+    try {
+      await operation();
+      setOnlineMessage("");
+      return true;
+    } catch (error) {
+      setOnlineMessage(error instanceof Error ? error.message : "游戏请求失败，请检查连接后重试。");
+      setOnlineStatus(current => current === "connecting" ? "error" : current);
+      return false;
+    } finally {
+      onlineBusyRef.current = false;
+      setOnlineBusy(false);
     }
   }, []);
 
-  const connectOnlineStream = useCallback(
-    (gameId: string) => {
-      closeOnlineStream();
-      try {
-        const es = new EventSource(buildOnlineUrl(`/api/games/${encodeURIComponent(gameId)}/events`));
-        sseRef.current = es;
-
-        es.addEventListener("state", (e: MessageEvent) => {
-          try {
-            const state = JSON.parse(e.data) as ServerGameState;
-            setOnlineStatus("connected");
-            setOnlineMessage(`实时同步中 · 房间 #${state.id}`);
-            loadServerState(state);
-          } catch {
-            // Ignore malformed SSE payload
-          }
-        });
-
-        es.onopen = () => {
-          setOnlineStatus("connected");
-          setOnlineMessage(`实时同步中 · 房间 #${gameId}`);
-        };
-
-        es.onerror = () => {
-          setOnlineStatus("error");
-          setOnlineMessage("SSE 实时流已断开 · 等待后端响应或点击重连");
-        };
-      } catch {
-        setOnlineStatus("error");
-        setOnlineMessage("无法初始化 EventSource，请检查游戏后端地址");
-      }
-    },
-    [closeOnlineStream, loadServerState]
-  );
-
   const createOnlineRoom = useCallback(
     async (preferredColor: PieceColor = playerColor) => {
-      closeOnlineStream();
-      setOnlineStatus("connecting");
-      setOnlineMessage("正在向游戏后端请求创建房间...");
-      try {
-        const res = await fetch(buildOnlineUrl("/api/games"), {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ humanColor: preferredColor }),
-        });
-        if (!res.ok) {
-          throw new Error(`HTTP ${res.status}`);
-        }
-        const data = (await res.json()) as ServerGameState;
-        if (data.credentials) {
-          saveCredentialsToStorage(data.id, data.credentials);
-        }
-        setFlipped(preferredColor === "b");
-        loadServerState(data, true);
-        setOnlineStatus("connected");
-        setOnlineMessage(`已创建并连接房间 #${data.id}`);
-        connectOnlineStream(data.id);
-      } catch {
-        setOnlineStatus("error");
-        setOnlineMessage("未检测到游戏后端响应（已预留 /api/games 接口）");
-      }
-    },
-    [closeOnlineStream, connectOnlineStream, loadServerState, playerColor, saveCredentialsToStorage]
+      await runOnlineOperation(async () => {
+        await onlineClientRef.current!.create(preferredColor);
+      });
+    }, [playerColor, runOnlineOperation]
   );
 
-  const joinOnlineRoom = useCallback(
-    async (targetId: string) => {
-      const cleanId = targetId.trim();
-      if (!cleanId) {
-        setOnlineStatus("error");
-        setOnlineMessage("请输入有效的联机房间号");
-        return;
-      }
-      closeOnlineStream();
-      setOnlineStatus("connecting");
-      setOnlineMessage(`正在连接房间 #${cleanId}...`);
-      try {
-        const res = await fetch(buildOnlineUrl(`/api/games/${encodeURIComponent(cleanId)}`));
-        if (!res.ok) {
-          throw new Error(`HTTP ${res.status}`);
-        }
-        const data = (await res.json()) as ServerGameState;
-        const saved = loadCredentialsFromStorage(cleanId);
-        setCredentials(saved);
-        if (data.humanColor) {
-          setFlipped(data.humanColor === "b");
-        }
-        loadServerState(data, true);
-        setOnlineStatus("connected");
-        setOnlineMessage(`已加入房间 #${data.id}`);
-        connectOnlineStream(data.id);
-      } catch {
-        setOnlineStatus("error");
-        setOnlineMessage(`无法连接房间 #${cleanId}（请确认游戏后端已启动）`);
-      }
-    },
-    [closeOnlineStream, connectOnlineStream, loadCredentialsFromStorage, loadServerState]
-  );
+  const joinOnlineRoom = useCallback(async (input: string) => {
+    await runOnlineOperation(async () => {
+      await onlineClientRef.current!.connect(input, window.location.href);
+    });
+  }, [runOnlineOperation]);
 
-  // Check URL query parameter `?game=...` on mount
+  const sendOnlineCommand = useCallback((
+    action: "moves" | "undo" | "reset" | "actions/respond",
+    fields: Record<string, unknown> = {},
+  ) => runOnlineOperation(async () => {
+    await onlineClientRef.current!.command(action, fields);
+  }), [runOnlineOperation]);
+
+  // Only mount/unmount initializes the connection; board versions never reopen the stream.
   useEffect(() => {
+    const client = new OnlineChessClient({
+      baseUrl: SERVER_BASE_URL,
+      storage: window.localStorage,
+      onState: loadServerState,
+      onConnection: setOnlineStatus,
+    });
+    onlineClientRef.current = client;
     const timer = window.setTimeout(() => {
-      const params = new URLSearchParams(window.location.search);
-      const urlGameId = params.get("game");
-      if (urlGameId) {
+      if (new URL(window.location.href).searchParams.has("game")) {
         setMode("online");
-        setRoomInput(urlGameId);
-        void joinOnlineRoom(urlGameId);
+        void client.connect(window.location.href).catch(error => {
+          setOnlineStatus("error");
+          setOnlineMessage(error instanceof Error ? error.message : "无法连接棋局。");
+        });
       }
     }, 0);
     return () => {
       window.clearTimeout(timer);
-      closeOnlineStream();
-      if (aiTimerRef.current) {
-        window.clearTimeout(aiTimerRef.current);
-      }
+      client.disconnect();
+      if (onlineClientRef.current === client) onlineClientRef.current = null;
     };
-  }, [closeOnlineStream, joinOnlineRoom]);
+  }, [loadServerState]);
 
   // Auto-scroll move history
   useEffect(() => {
@@ -480,12 +390,12 @@ export function ChessPage() {
     if (status.over || aiThinking) return false;
     if (mode === "local") return true;
     if (mode === "online") {
-      if (!onlineGameId || onlineStatus !== "connected") return false;
-      if (credentials?.humanToken) return game.turn === playerColor;
-      return true;
+      return Boolean(onlineGameId && onlineStatus === "connected" && !onlineBusyRef.current
+        && credentials?.humanToken && onlineState?.phase === "playing"
+        && game.turn === playerColor);
     }
     return game.turn === playerColor;
-  }, [aiThinking, credentials, mode, onlineGameId, onlineStatus, playerColor]);
+  }, [aiThinking, credentials, mode, onlineGameId, onlineState, onlineStatus, playerColor]);
 
   const executePlayerMove = useCallback(
     async (move: ChessMove) => {
@@ -494,28 +404,7 @@ export function ChessPage() {
       setPendingPromotionMoves(null);
 
       if (mode === "online") {
-        if (!onlineGameId) return;
-        const uci = moveToUCI(move);
-        const headers: Record<string, string> = { "Content-Type": "application/json" };
-        if (credentials?.humanToken) {
-          headers.Authorization = `Bearer ${credentials.humanToken}`;
-        }
-        try {
-          const res = await fetch(buildOnlineUrl(`/api/games/${encodeURIComponent(onlineGameId)}/moves`), {
-            method: "POST",
-            headers,
-            body: JSON.stringify({ move: uci, version: onlineVersion }),
-          });
-          if (res.ok) {
-            const state = (await res.json()) as ServerGameState;
-            loadServerState(state);
-          } else {
-            setOnlineMessage("走子提交被拒绝（非当前执子方或状态版本冲突）");
-          }
-        } catch {
-          setOnlineStatus("error");
-          setOnlineMessage("网络请求失败，无法提交走子到游戏后端");
-        }
+        await sendOnlineCommand("moves", { move: moveToUCI(move) });
         return;
       }
 
@@ -533,11 +422,8 @@ export function ChessPage() {
     [
       animateBoardMove,
       autoFlipLocal,
-      credentials,
-      loadServerState,
       mode,
-      onlineGameId,
-      onlineVersion,
+      sendOnlineCommand,
       playSoundForLastMove,
       syncView,
     ]
@@ -717,31 +603,16 @@ export function ChessPage() {
       setPendingPromotionMoves(null);
 
       if (nextMode === "online") {
-        if (onlineGameId && onlineStatus === "connected" && credentials?.humanToken) {
-          try {
-            const res = await fetch(buildOnlineUrl(`/api/games/${encodeURIComponent(onlineGameId)}/reset`), {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-                Authorization: `Bearer ${credentials.humanToken}`,
-              },
-              body: JSON.stringify({ version: onlineVersion }),
-            });
-            if (res.ok) {
-              const state = (await res.json()) as ServerGameState;
-              loadServerState(state, true);
-              getSfx().playSelect();
-              return;
-            }
-          } catch {
-            // Fall through to creating a new room
-          }
+        if (onlineGameId && credentials?.humanToken && onlineState?.phase !== "waiting") {
+          await sendOnlineCommand("reset");
+        } else {
+          await createOnlineRoom(nextPlayerColor);
         }
-        await createOnlineRoom(nextPlayerColor);
         return;
       }
 
       closeOnlineStream();
+      serverStateRef.current = null;
       gameRef.current.reset();
       if (nextMode === "ai") {
         setFlipped(nextPlayerColor === "b");
@@ -756,11 +627,10 @@ export function ChessPage() {
       createOnlineRoom,
       credentials,
       getSfx,
-      loadServerState,
       mode,
       onlineGameId,
-      onlineStatus,
-      onlineVersion,
+      onlineState,
+      sendOnlineCommand,
       playerColor,
       syncView,
     ]
@@ -771,24 +641,7 @@ export function ChessPage() {
     const game = gameRef.current;
 
     if (mode === "online") {
-      if (!onlineGameId || !credentials?.humanToken) return;
-      try {
-        const res = await fetch(buildOnlineUrl(`/api/games/${encodeURIComponent(onlineGameId)}/undo`), {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${credentials.humanToken}`,
-          },
-          body: JSON.stringify({ version: onlineVersion }),
-        });
-        if (res.ok) {
-          const state = (await res.json()) as ServerGameState;
-          loadServerState(state, true);
-          getSfx().playSelect();
-        }
-      } catch {
-        setOnlineMessage("悔棋请求失败，请检查后端连接");
-      }
+      await sendOnlineCommand("undo");
       return;
     }
 
@@ -815,12 +668,9 @@ export function ChessPage() {
     aiThinking,
     autoFlipLocal,
     clearSelection,
-    credentials,
     getSfx,
-    loadServerState,
     mode,
-    onlineGameId,
-    onlineVersion,
+    sendOnlineCommand,
     pendingPromotionMoves,
     playerColor,
     syncView,
@@ -837,6 +687,10 @@ export function ChessPage() {
         void joinOnlineRoom(onlineGameId);
       }
     } else {
+      const url = new URL(window.location.href);
+      url.searchParams.delete("game");
+      url.hash = "";
+      window.history.replaceState(window.history.state, "", url);
       closeOnlineStream();
       void startNewGame(nextMode, playerColor);
     }
@@ -853,12 +707,16 @@ export function ChessPage() {
     }
   };
 
-  const copyTextWithFeedback = (text: string, label: string) => {
-    void navigator.clipboard?.writeText(text);
-    setCopiedFeedback(label);
-    window.setTimeout(() => {
-      setCopiedFeedback((prev) => (prev === label ? null : prev));
-    }, 2000);
+  const copyTextWithFeedback = async (text: string, label: string) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopiedFeedback(label);
+      window.setTimeout(() => {
+        setCopiedFeedback((prev) => (prev === label ? null : prev));
+      }, 2000);
+    } catch {
+      setOnlineMessage("浏览器未允许复制，请选中下方邀请链接手动复制。");
+    }
   };
 
   const {
@@ -915,6 +773,12 @@ export function ChessPage() {
   }
 
   const selectedPiece = selectedSquare ? board[selectedSquare.r][selectedSquare.c] : null;
+  const opponentColor = playerColor === "w" ? "b" : "w";
+  const onlineHint = onlineStatus === "error" ? "连接中断，正在自动重连；棋局已保留。"
+    : !onlineGameId ? "创建房间并分享邀请链接，或粘贴对方的完整邀请链接加入。"
+    : !credentials?.humanToken ? "当前为观战模式；参与对局请使用创建者的完整邀请链接。"
+    : onlineState?.phase === "waiting" ? "等待对手入座：请复制邀请链接，让对方在另一浏览器或设备中打开。"
+    : `你执${playerColor === "w" ? "白" : "黑"} · ${onlineState?.presence?.[opponentColor] ? "对手在线" : "对手暂时离线，棋局保留"}`;
 
   return (
     <section className="chess-page-shell chess-theme-walnut" aria-label="Atelier Chess 国际象棋对局室">
@@ -1237,20 +1101,23 @@ export function ChessPage() {
                   <input
                     type="text"
                     className="chess-room-input"
-                    placeholder="输入房间号加入，如 a1b2c3d4"
+                    aria-label="房间号或完整邀请链接"
+                    placeholder="粘贴完整邀请链接；仅房间号可观战"
                     value={roomInput}
                     onChange={(e) => setRoomInput(e.target.value)}
                   />
                   <button
                     type="button"
                     className="chess-secondary-btn"
+                    disabled={onlineBusy}
                     onClick={() => void joinOnlineRoom(roomInput)}
                   >
-                    加入房间
+                    加入 / 恢复
                   </button>
                   <button
                     type="button"
                     className="chess-primary-btn"
+                    disabled={onlineBusy}
                     onClick={() => void createOnlineRoom(playerColor)}
                   >
                     创建房间
@@ -1262,33 +1129,56 @@ export function ChessPage() {
                     <button
                       type="button"
                       className="chess-share-btn"
+                      disabled={!credentials?.inviteToken}
                       onClick={() => {
-                        const url = new URL(window.location.href);
-                        url.searchParams.set("page", "chess");
-                        url.searchParams.set("game", onlineGameId);
-                        copyTextWithFeedback(url.toString(), "link");
+                        try {
+                          copyTextWithFeedback(onlineClientRef.current!.invitation(window.location.href), "link");
+                        } catch (error) {
+                          setOnlineMessage(error instanceof Error ? error.message : "无法复制邀请链接。");
+                        }
                       }}
                     >
-                      {copiedFeedback === "link" ? "已复制房间链接 ✦" : `复制房间链接 (#${onlineGameId})`}
+                      {copiedFeedback === "link" ? "已复制邀请链接 ✦" : "复制邀请链接"}
                     </button>
                     <button
                       type="button"
                       className="chess-share-btn"
                       onClick={() => {
-                        const base = SERVER_BASE_URL || window.location.origin;
-                        const info = credentials?.agentToken
-                          ? `Room ID: ${onlineGameId}\nAgent Token: ${credentials.agentToken}\nMove API: POST ${base}/api/games/${onlineGameId}/moves`
-                          : `Room ID: ${onlineGameId}\nState API: GET ${base}/api/games/${onlineGameId}`;
-                        copyTextWithFeedback(info, "creds");
+                        copyTextWithFeedback(onlineGameId, "room");
                       }}
                     >
-                      {copiedFeedback === "creds" ? "已复制联机凭证 ✦" : "复制联机 / Agent 凭证"}
+                      {copiedFeedback === "room" ? "已复制房间号 ✦" : "复制房间号（观战）"}
                     </button>
                   </div>
-                ) : onlineMessage ? (
-                  <div className="chess-online-status-row">
-                    <span className={`chess-online-dot is-${onlineStatus}`} />
-                    <span className="chess-online-status-text">{onlineMessage}</span>
+                ) : null}
+                {invitationLink ? (
+                  <label className="chess-input-field">
+                    <span>邀请链接（可选中复制）</span>
+                    <input aria-label="邀请链接" readOnly value={invitationLink}
+                      onFocus={event => event.currentTarget.select()} />
+                  </label>
+                ) : null}
+                <div className="chess-online-status-row" role="status" aria-live="polite">
+                  <span className={`chess-online-dot is-${onlineStatus}`} />
+                  <span className="chess-online-status-text">{onlineMessage || onlineHint}</span>
+                </div>
+                {onlineGameId && credentials?.humanToken && !credentials.inviteToken && onlineState?.phase === "waiting" ? (
+                  <p className="chess-mode-hint">旧房间未保存邀请信息，请创建新房间后邀请对手。</p>
+                ) : null}
+                {onlineState?.pendingAction ? (
+                  <div className="chess-online-request" aria-live="polite">
+                    <p className="chess-mode-hint">
+                      {onlineState.pendingAction.by === playerColor && credentials?.humanToken ? "已发出" : "对方提出"}
+                      {onlineState.pendingAction.type === "undo" ? "悔棋" : onlineState.pendingAction.type === "reset" ? "重开" : "和棋"}请求
+                    </p>
+                    {credentials?.humanToken && onlineState.pendingAction.by !== playerColor ? (
+                      <div className="chess-pill-group">
+                        <button type="button" className="chess-primary-btn" disabled={onlineBusy}
+                          onClick={() => void sendOnlineCommand("actions/respond", { actionId: onlineState.pendingAction!.id, accept: true })}>同意</button>
+                        <button type="button" className="chess-secondary-btn" disabled={onlineBusy}
+                          onClick={() => void sendOnlineCommand("actions/respond", { actionId: onlineState.pendingAction!.id, accept: false })}>拒绝</button>
+                      </div>
+                    ) : null}
                   </div>
                 ) : null}
               </div>
@@ -1311,7 +1201,7 @@ export function ChessPage() {
               <button
                 type="button"
                 className="chess-action-btn"
-                disabled={history.length === 0 || aiThinking}
+                disabled={history.length === 0 || aiThinking || (mode === "online" && (onlineBusy || !credentials?.humanToken || Boolean(onlineState?.pendingAction)))}
                 onClick={() => void handleUndo()}
               >
                 <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="1.8">
