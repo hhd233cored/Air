@@ -11,6 +11,7 @@ import { CommentsPanel } from "./components/CommentsPanel";
 import { highlightCode, languageKey, languageLabel, MarkdownRenderer } from "./components/MarkdownRenderer";
 import { MaintenancePage } from "./components/MaintenancePage";
 import { CoverCarousel, SiteHeader, type SitePageKey } from "./components/SiteChrome";
+import { ChessPage } from "./components/ChessPage";
 
 type PageKey = SitePageKey;
 
@@ -1814,8 +1815,9 @@ function SiteApp() {
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
-      const requestedPage = new URLSearchParams(window.location.search).get("page");
-      if (requestedPage === "article" || requestedPage === "chatter" || requestedPage === "guestbook") {
+      const params = new URLSearchParams(window.location.search);
+      const requestedPage = params.get("page") ?? (params.get("game") ? "chess" : null);
+      if (requestedPage === "article" || requestedPage === "chatter" || requestedPage === "guestbook" || requestedPage === "chess") {
         pendingNavigationScrollRef.current = true;
         setActivePage(requestedPage);
       }
@@ -1912,7 +1914,7 @@ function SiteApp() {
         {activePage === "article" && selectedArticleSlug ? <div className="content-backdrop__detail-background" aria-hidden="true" /> : null}
         {activePage === "chatter" ? <div className="content-backdrop__chatter-background" aria-hidden="true" /> : null}
         {activePage === "guestbook" ? <div className="content-backdrop__guestbook-background" aria-hidden="true" /> : null}
-        {activePage !== "article" && activePage !== "chatter" && activePage !== "guestbook" ? <ClockDisplay now={now} /> : null}
+        {activePage !== "article" && activePage !== "chatter" && activePage !== "guestbook" && activePage !== "chess" ? <ClockDisplay now={now} /> : null}
 
         <div className="workspace-shell shell">
           <div className={`home-page-layer ${activePage === "home" ? "" : "is-hidden"}`}>
@@ -1921,6 +1923,7 @@ function SiteApp() {
           {activePage === "projects" && <ProjectsPage />}
           {activePage === "chatter" && <ChatterPage currentUser={authUser} onRequestLogin={() => setAuthPanelOpen(true)} />}
           {activePage === "guestbook" && <GuestbookPage currentUser={authUser} onRequestLogin={() => setAuthPanelOpen(true)} />}
+          {activePage === "chess" && <ChessPage />}
 
 
           <div className={`home-page-layer ${activePage === "article" && !selectedArticleSlug ? "" : "is-hidden"}`}><ArticleListPage onOpenArticle={openArticle} /></div>

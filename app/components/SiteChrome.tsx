@@ -5,13 +5,14 @@ import type { AuthUser } from "../lib/api/auth";
 import { resolveApiUrl } from "../lib/api/client";
 import { AuthPanel } from "./AuthPanel";
 
-export type SitePageKey = "home" | "projects" | "article" | "chatter" | "guestbook";
+export type SitePageKey = "home" | "projects" | "article" | "chatter" | "guestbook" | "chess";
 
 export const siteNavigation: { id: SitePageKey; label: string; index: string }[] = [
   { id: "home", label: "Home", index: "01" },
   { id: "article", label: "Article", index: "02" },
   { id: "chatter", label: "Dairy", index: "03" },
   { id: "guestbook", label: "Guestbook", index: "04" },
+  { id: "chess", label: "Chess", index: "05" },
 ];
 
 const coverImages = ["1.png", "2.jpg", "3.png", "4.png", "5.jpg", "6.png", "7.jpg", "8.png", "9.jpg"]
